@@ -1,14 +1,11 @@
 services:
-  ffmpeg-web:
-    build:
-      context: .
-      dockerfile: Dockerfile.nvidia
-    container_name: ffmpeg-web-nvidia
+  ffforge:
+    container_name: channinghe/ffforge:nvidia
     ports:
       - "38110:8080"
     volumes:
       # Mount your video files directory
-      - /Volumes/Codes/video:/data
+      - /your/media/path:/data
       # Mount output directory
       - ./output:/output
       # Mount config directory
@@ -22,8 +19,6 @@ services:
       - OUTPUT_PATH=/output
       - CONFIG_PATH=/app/config
       - DATABASE_PATH=/app/database/ffmpeg-web.db
-      - MAX_CONCURRENT_TASKS=4
-      - ENABLE_GPU=true
     # NVIDIA GPU configuration
     deploy:
       resources:

@@ -1,6 +1,6 @@
 services:
-  ffweb:
-    container_name: channinghe/ffweb:latest
+  ffforge:
+    container_name: channinghe/ffforge:latest
     restart: unless-stopped
     ports:
       - "38110:8080"
