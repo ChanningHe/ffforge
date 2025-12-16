@@ -90,7 +90,7 @@ COPY --from=backend-builder /app/server ./
 COPY --from=frontend-builder /app/frontend/dist ./web
 
 # Create necessary directories
-RUN mkdir -p /data /output /app/config /app/database
+RUN mkdir -p /data /output /app/config /app/config/database
 
 # Expose port
 EXPOSE 8080
@@ -101,7 +101,7 @@ ENV GIN_MODE=release \
     DATA_PATH=/data \
     OUTPUT_PATH=/output \
     CONFIG_PATH=/app/config \
-    DATABASE_PATH=/app/database/ffmpeg-web.db \
+    DATABASE_PATH=/app/config/database/ffforge.db \
     MAX_CONCURRENT_TASKS=4 \
     ENABLE_GPU=true
 

@@ -141,7 +141,7 @@ func loadConfig() *Config {
 		DataPath:           getEnv("DATA_PATH", "/data"),
 		OutputPath:         getEnv("OUTPUT_PATH", "/output"),
 		ConfigPath:         getEnv("CONFIG_PATH", "./config"),
-		DatabasePath:       getEnv("DATABASE_PATH", "./database/ffmpeg-web.db"),
+		DatabasePath:       getEnv("DATABASE_PATH", "./config/database/ffforge.db"),
 		MaxConcurrentTasks: getEnvInt("MAX_CONCURRENT_TASKS", 2),
 		EnableGPU:          getEnvBool("ENABLE_GPU", true),
 		CORSOrigins:        getEnv("CORS_ORIGINS", "http://localhost:3000"),

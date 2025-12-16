@@ -4,7 +4,12 @@ import { useApp } from '@/contexts/AppContext'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
-import { Sun, Moon, Monitor, Check } from 'lucide-react'
+import { Slider } from '@/components/ui/slider'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Separator } from '@/components/ui/separator'
+import { Sun, Moon, Monitor, Check, Languages, Palette, Settings2, FolderOpen, Zap, RotateCcw } from 'lucide-react'
+import { cn } from '@/lib/utils'
 
 export default function SettingsPage() {
   const { t, language, setLanguage, theme, setTheme, settings, updateSettings } = useApp()
@@ -28,78 +33,97 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="flex flex-1 flex-col gap-6">
       {/* Header */}
-      <div className="border-b bg-background p-4">
-        <h1 className="text-2xl font-bold">{t.settings.title}</h1>
-        <p className="text-sm text-muted-foreground">
+      <div>
+        <h1 className="text-3xl font-bold tracking-tight">{t.settings.title}</h1>
+        <p className="text-muted-foreground mt-1.5">
           {t.settings.subtitle}
         </p>
       </div>
 
-      {/* Content */}
-      <div className="flex-1 overflow-auto p-6">
-        <div className="max-w-2xl mx-auto space-y-6">
-          {/* General Settings */}
-          <Card>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Main Settings */}
+        <div className="lg:col-span-2 space-y-6">
+          {/* Appearance Settings */}
+          <Card className="border-2">
             <CardHeader>
-              <CardTitle>{t.settings.general}</CardTitle>
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-lg bg-primary/10">
+                  <Palette className="h-4 w-4 text-primary" />
+                </div>
+                <div>
+                  <CardTitle>{t.settings.general}</CardTitle>
+                  <CardDescription className="mt-1">Customize your interface preferences</CardDescription>
+                </div>
+              </div>
             </CardHeader>
             <CardContent className="space-y-6">
               {/* Language */}
-              <div>
-                <label className="block text-sm font-medium mb-2">
-                  {t.settings.language}
-                </label>
-                <div className="flex gap-2">
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <Languages className="h-4 w-4 text-muted-foreground" />
+                  <Label className="text-sm font-medium">{t.settings.language}</Label>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
                   <Button
                     variant={language === 'zh' ? 'default' : 'outline'}
                     onClick={() => setLanguage('zh')}
-                    className="flex-1"
+                    className="justify-start h-auto py-3"
                   >
-                    {language === 'zh' && <Check className="w-4 h-4 mr-2" />}
-                    中文
+                    <div className="flex items-center gap-2">
+                      {language === 'zh' && <Check className="h-4 w-4" />}
+                      <div className="text-left">
+                        <div className="font-medium">中文</div>
+                        <div className="text-xs opacity-70">Chinese</div>
+                      </div>
+                    </div>
                   </Button>
                   <Button
                     variant={language === 'en' ? 'default' : 'outline'}
                     onClick={() => setLanguage('en')}
-                    className="flex-1"
+                    className="justify-start h-auto py-3"
                   >
-                    {language === 'en' && <Check className="w-4 h-4 mr-2" />}
-                    English
+                    <div className="flex items-center gap-2">
+                      {language === 'en' && <Check className="h-4 w-4" />}
+                      <div className="text-left">
+                        <div className="font-medium">English</div>
+                        <div className="text-xs opacity-70">英语</div>
+                      </div>
+                    </div>
                   </Button>
                 </div>
               </div>
 
+              <Separator />
+
               {/* Theme */}
-              <div>
-                <label className="block text-sm font-medium mb-2">
-                  {t.settings.theme}
-                </label>
-                <div className="grid grid-cols-3 gap-2">
+              <div className="space-y-3">
+                <Label className="text-sm font-medium">{t.settings.theme}</Label>
+                <div className="grid grid-cols-3 gap-3">
                   <Button
                     variant={theme === 'light' ? 'default' : 'outline'}
                     onClick={() => setTheme('light')}
-                    className="flex flex-col items-center justify-center h-20"
+                    className="flex flex-col items-center justify-center h-24 gap-2"
                   >
-                    <Sun className="w-6 h-6 mb-1" />
-                    <span className="text-xs">{t.settings.themeOptions.light}</span>
+                    <Sun className="h-6 w-6" />
+                    <span className="text-xs font-medium">{t.settings.themeOptions.light}</span>
                   </Button>
                   <Button
                     variant={theme === 'dark' ? 'default' : 'outline'}
                     onClick={() => setTheme('dark')}
-                    className="flex flex-col items-center justify-center h-20"
+                    className="flex flex-col items-center justify-center h-24 gap-2"
                   >
-                    <Moon className="w-6 h-6 mb-1" />
-                    <span className="text-xs">{t.settings.themeOptions.dark}</span>
+                    <Moon className="h-6 w-6" />
+                    <span className="text-xs font-medium">{t.settings.themeOptions.dark}</span>
                   </Button>
                   <Button
                     variant={theme === 'system' ? 'default' : 'outline'}
                     onClick={() => setTheme('system')}
-                    className="flex flex-col items-center justify-center h-20"
+                    className="flex flex-col items-center justify-center h-24 gap-2"
                   >
-                    <Monitor className="w-6 h-6 mb-1" />
-                    <span className="text-xs">{t.settings.themeOptions.system}</span>
+                    <Monitor className="h-6 w-6" />
+                    <span className="text-xs font-medium">{t.settings.themeOptions.system}</span>
                   </Button>
                 </div>
               </div>
@@ -107,47 +131,66 @@ export default function SettingsPage() {
           </Card>
 
           {/* Transcoding Settings */}
-          <Card>
+          <Card className="border-2">
             <CardHeader>
-              <CardTitle>{t.settings.transcoding}</CardTitle>
-              <CardDescription>
-                Configure default transcoding behavior
-              </CardDescription>
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-lg bg-primary/10">
+                  <Settings2 className="h-4 w-4 text-primary" />
+                </div>
+                <div>
+                  <CardTitle>{t.settings.transcoding}</CardTitle>
+                  <CardDescription className="mt-1">Configure default transcoding behavior</CardDescription>
+                </div>
+              </div>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-6">
               {/* Default Output Path */}
-              <div>
-                <label className="block text-sm font-medium mb-2">
-                  {t.settings.defaultOutputPath}
-                </label>
-                <input
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <FolderOpen className="h-4 w-4 text-muted-foreground" />
+                  <Label htmlFor="output-path" className="text-sm font-medium">
+                    {t.settings.defaultOutputPath}
+                  </Label>
+                </div>
+                <Input
+                  id="output-path"
                   type="text"
-                  className="w-full p-2 border rounded-md bg-background"
                   value={localSettings.defaultOutputPath}
                   onChange={(e) =>
                     setLocalSettings({ ...localSettings, defaultOutputPath: e.target.value })
                   }
                   placeholder="/output"
+                  className="font-mono text-sm"
                 />
+                <p className="text-xs text-muted-foreground">
+                  Default directory for transcoded video files
+                </p>
               </div>
 
+              <Separator />
+
               {/* Enable GPU */}
-              <div className="flex items-center justify-between">
-                <div>
-                  <label className="text-sm font-medium">
-                    {t.settings.enableGPU}
-                  </label>
-                  <p className="text-xs text-muted-foreground mt-1">
+              <div className="flex items-center justify-between space-x-4">
+                <div className="flex-1 space-y-1">
+                  <div className="flex items-center gap-2">
+                    <Zap className="h-4 w-4 text-muted-foreground" />
+                    <Label className="text-sm font-medium">
+                      {t.settings.enableGPU}
+                    </Label>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
                     Use GPU acceleration when available
                   </p>
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className={cn(
-                    "text-sm font-medium transition-colors",
-                    localSettings.enableGPU ? "text-primary" : "text-muted-foreground"
+                  <div className={cn(
+                    "text-xs font-medium px-2 py-1 rounded-md transition-colors",
+                    localSettings.enableGPU 
+                      ? "bg-primary/10 text-primary" 
+                      : "bg-muted text-muted-foreground"
                   )}>
                     {localSettings.enableGPU ? 'ON' : 'OFF'}
-                  </span>
+                  </div>
                   <Switch
                     checked={localSettings.enableGPU}
                     onCheckedChange={(checked) =>
@@ -157,58 +200,107 @@ export default function SettingsPage() {
                 </div>
               </div>
 
+              <Separator />
+
               {/* Max Concurrent Tasks */}
-              <div>
-                <label className="block text-sm font-medium mb-2">
-                  {t.settings.maxConcurrentTasks}
-                </label>
-                <div className="flex items-center gap-4">
-                  <input
-                    type="range"
-                    min="1"
-                    max="10"
-                    value={localSettings.maxConcurrentTasks}
-                    onChange={(e) =>
-                      setLocalSettings({
-                        ...localSettings,
-                        maxConcurrentTasks: parseInt(e.target.value),
-                      })
-                    }
-                    className="flex-1"
-                  />
-                  <span className="text-sm font-medium w-8 text-center">
-                    {localSettings.maxConcurrentTasks}
-                  </span>
+              <div className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <Label className="text-sm font-medium">
+                    {t.settings.maxConcurrentTasks}
+                  </Label>
+                  <div className="flex items-center gap-2">
+                    <span className="text-2xl font-bold text-primary">
+                      {localSettings.maxConcurrentTasks}
+                    </span>
+                    <span className="text-sm text-muted-foreground">tasks</span>
+                  </div>
                 </div>
-                <p className="text-xs text-muted-foreground mt-1">
+                <Slider
+                  min={1}
+                  max={10}
+                  value={localSettings.maxConcurrentTasks}
+                  onChange={(val) =>
+                    setLocalSettings({
+                      ...localSettings,
+                      maxConcurrentTasks: val,
+                    })
+                  }
+                  className="py-2"
+                />
+                <div className="flex justify-between text-xs text-muted-foreground">
+                  <span>1 task</span>
+                  <span>10 tasks</span>
+                </div>
+                <p className="text-xs text-muted-foreground">
                   Number of videos to transcode simultaneously
                 </p>
               </div>
             </CardContent>
           </Card>
+        </div>
 
-          {/* Actions */}
-          <div className="flex gap-3">
-            <Button onClick={handleSave} className="flex-1">
-              {saved ? (
-                <>
-                  <Check className="w-4 h-4 mr-2" />
-                  {t.settings.saved}
-                </>
-              ) : (
-                t.settings.save
-              )}
-            </Button>
-            <Button variant="outline" onClick={handleReset}>
-              {t.settings.reset}
-            </Button>
-          </div>
+        {/* Sidebar Actions & Info */}
+        <div className="space-y-6">
+          {/* Actions Card */}
+          <Card className="border-2 border-primary/20 bg-primary/5">
+            <CardHeader>
+              <CardTitle className="text-base">Actions</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <Button 
+                onClick={handleSave} 
+                className="w-full gap-2" 
+                size="lg"
+                disabled={saved}
+              >
+                {saved ? (
+                  <>
+                    <Check className="h-4 w-4" />
+                    {t.settings.saved}
+                  </>
+                ) : (
+                  <>
+                    <Check className="h-4 w-4" />
+                    {t.settings.save}
+                  </>
+                )}
+              </Button>
+              <Button 
+                variant="outline" 
+                onClick={handleReset}
+                className="w-full gap-2"
+                size="lg"
+              >
+                <RotateCcw className="h-4 w-4" />
+                {t.settings.reset}
+              </Button>
+            </CardContent>
+          </Card>
+
+          {/* Info Card */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Settings Info</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Version</span>
+                <span className="font-medium">v1.0.0</span>
+              </div>
+              <Separator />
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Language</span>
+                <span className="font-medium">{language === 'zh' ? '中文' : 'English'}</span>
+              </div>
+              <Separator />
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Theme</span>
+                <span className="font-medium capitalize">{theme}</span>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
     </div>
   )
-}
-
-function cn(...classes: (string | boolean | undefined)[]) {
-  return classes.filter(Boolean).join(' ')
 }

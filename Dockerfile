@@ -43,7 +43,7 @@ RUN CGO_ENABLED=1 \
 # Stage 3: Runtime image
 # Use standard Ubuntu for ARM/general compatibility
 # For NVIDIA GPU support, use: nvidia/cuda:12.2.0-runtime-ubuntu22.04
-FROM ubuntu:22.04
+FROM ubuntu:25.10
 
 # Use build arguments to detect architecture
 ARG TARGETARCH
@@ -57,7 +57,7 @@ RUN apt-get update && apt-get install -y \
 
 # Try to install Intel drivers if available (x86_64 only)
 RUN apt-get update && \
-    (apt-get install -y intel-media-va-driver-non-free libva-drm2 || true) && \
+    (apt-get install -y intel-media-va-driver-non-free libva-drm2 vainfo intel-opencl-icd || true) && \
     rm -rf /var/lib/apt/lists/*
 
 # Download and install FFmpeg static build based on architecture
@@ -91,7 +91,7 @@ COPY --from=backend-builder /app/server ./
 COPY --from=frontend-builder /app/frontend/dist ./web
 
 # Create necessary directories
-RUN mkdir -p /data /output /app/config /app/database
+RUN mkdir -p /data /output /app/config /app/config/database
 
 # Expose port
 EXPOSE 8080
@@ -102,7 +102,7 @@ ENV GIN_MODE=release \
     DATA_PATH=/data \
     OUTPUT_PATH=/output \
     CONFIG_PATH=/app/config \
-    DATABASE_PATH=/app/database/ffmpeg-web.db \
+    DATABASE_PATH=/app/config/database/ffforge.db \
     MAX_CONCURRENT_TASKS=2 \
     ENABLE_GPU=true \
     FFMPEG_PATH=/usr/local/bin/ffmpeg \

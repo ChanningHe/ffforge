@@ -82,47 +82,65 @@ export default function PresetsPage() {
   }, [presetConfig])
 
   const generateCommandPreview = (config: TranscodeConfig) => {
+    const inputFile = 'input.mp4'
+    const outputFile = `output${config.output.suffix}.${config.output.container}`
+    
     if (config.mode === 'advanced' && config.customCommand) {
-      setCommandPreview(`ffmpeg -i input.mp4 ${config.customCommand} output.${config.output.container}`)
+      // Advanced mode: replace [[INPUT]] and [[OUTPUT]] placeholders
+      let customCmd = config.customCommand.trim()
+      customCmd = customCmd.replace(/\[\[INPUT\]\]/g, inputFile)
+      customCmd = customCmd.replace(/\[\[OUTPUT\]\]/g, outputFile)
+      setCommandPreview(`ffmpeg ${customCmd}`)
       return
     }
 
-    const parts: string[] = ['ffmpeg', '-i', 'input.mp4']
+    const parts: string[] = ['ffmpeg']
 
-    // Hardware acceleration
+    // IMPORTANT: Hardware acceleration flags must come BEFORE -i input file
     if (config.hardwareAccel === 'nvidia') {
       parts.push('-hwaccel', 'cuda', '-hwaccel_output_format', 'cuda')
     } else if (config.hardwareAccel === 'intel') {
-      parts.push('-hwaccel', 'qsv')
+      parts.push('-hwaccel', 'qsv', '-hwaccel_output_format', 'qsv')
     } else if (config.hardwareAccel === 'amd') {
-      parts.push('-hwaccel', 'vulkan')
+      // AMD AMF typically doesn't need input hardware acceleration
     }
 
-    // Video encoding
-    if (config.encoder === 'h265') {
-      if (config.hardwareAccel === 'nvidia') {
-        parts.push('-c:v', 'hevc_nvenc')
-      } else if (config.hardwareAccel === 'intel') {
-        parts.push('-c:v', 'hevc_qsv')
+    // Add input file
+    parts.push('-i', inputFile)
+
+    // Video codec
+    let videoCodec: string
+    if (config.hardwareAccel === 'nvidia') {
+      videoCodec = config.encoder === 'h265' ? 'hevc_nvenc' : 'av1_nvenc'
+    } else if (config.hardwareAccel === 'intel') {
+      videoCodec = config.encoder === 'h265' ? 'hevc_qsv' : 'av1_qsv'
+    } else if (config.hardwareAccel === 'amd') {
+      videoCodec = config.encoder === 'h265' ? 'hevc_amf' : 'av1_amf'
+    } else {
+      videoCodec = config.encoder === 'h265' ? 'libx265' : 'libsvtav1'
+    }
+    parts.push('-c:v', videoCodec)
+
+    // Encoding preset
+    if (config.video.preset) {
+      if (config.hardwareAccel === 'amd') {
+        parts.push('-quality', config.video.preset)
       } else {
-        parts.push('-c:v', 'libx265')
-      }
-    } else if (config.encoder === 'av1') {
-      if (config.hardwareAccel === 'nvidia') {
-        parts.push('-c:v', 'av1_nvenc')
-      } else {
-        parts.push('-c:v', 'libsvtav1')
+        parts.push('-preset', config.video.preset)
       }
     }
 
     // CRF/Quality
     if (config.video.crf !== undefined) {
-      parts.push('-crf', config.video.crf.toString())
-    }
-
-    // Preset
-    if (config.video.preset) {
-      parts.push('-preset', config.video.preset)
+      if (config.hardwareAccel === 'nvidia') {
+        parts.push('-cq', config.video.crf.toString())
+      } else if (config.hardwareAccel === 'intel') {
+        parts.push('-global_quality', config.video.crf.toString())
+      } else if (config.hardwareAccel === 'amd') {
+        parts.push('-qp_i', config.video.crf.toString())
+      } else {
+        parts.push('-crf', config.video.crf.toString())
+      }
     }
 
     // Audio
@@ -141,7 +159,7 @@ export default function PresetsPage() {
     }
 
     // Output
-    parts.push(`output${config.output.suffix}.${config.output.container}`)
+    parts.push(outputFile)
 
     setCommandPreview(parts.join(' '))
   }
@@ -346,15 +364,21 @@ export default function PresetsPage() {
   const isEditing = editMode === 'create' || editMode === 'edit'
 
   return (
-    <div className="h-full flex overflow-hidden">
-      {/* Left Sidebar - Presets List */}
-      <div className="w-80 border-r bg-background flex flex-col">
-        {/* Header */}
-        <div className="p-4 border-b">
-          <div className="flex items-center gap-2 mb-3">
-            <Sparkles className="h-5 w-5" />
-            <h1 className="text-lg font-bold">{t.presets.title}</h1>
-          </div>
+    <div className="flex flex-1 flex-col">
+      <div className="page-header">
+        <h1>{t.presets.title}</h1>
+        <p>{t.presets.subtitle}</p>
+      </div>
+
+      <div className="flex-1 flex overflow-hidden rounded-lg border bg-card shadow-sm">
+        {/* Left Sidebar - Presets List */}
+        <div className="w-80 border-r bg-card flex flex-col">
+          {/* Header */}
+          <div className="p-4 border-b">
+            <div className="flex items-center gap-2 mb-3">
+              <Sparkles className="h-5 w-5" />
+              <h2 className="text-lg font-bold">{language === 'zh' ? '预设列表' : 'Preset List'}</h2>
+            </div>
           
           {/* Actions */}
           <div className="flex gap-2">
@@ -411,14 +435,14 @@ export default function PresetsPage() {
                 const getHardwareColor = (hw: string) => {
                   switch (hw) {
                     case 'nvidia':
-                      return 'bg-green-500/20 text-green-700 dark:text-green-400'
+                      return 'bg-green-500/10 text-green-600 dark:text-green-500'
                     case 'intel':
-                      return 'bg-blue-500/20 text-blue-700 dark:text-blue-400'
+                      return 'bg-blue-500/10 text-blue-600 dark:text-blue-500'
                     case 'amd':
-                      return 'bg-red-500/20 text-red-700 dark:text-red-400'
+                      return 'bg-red-500/10 text-red-600 dark:text-red-500'
                     case 'cpu':
                     default:
-                      return 'bg-gray-500/20 text-gray-700 dark:text-gray-400'
+                      return 'bg-gray-500/10 text-gray-600 dark:text-gray-500'
                   }
                 }
                 
@@ -441,6 +465,17 @@ export default function PresetsPage() {
                         </div>
                       </div>
                       <div className="flex items-center gap-1 flex-shrink-0">
+                        {/* Built-in tag */}
+                        {preset.isBuiltin && (
+                          <span className={cn(
+                            'px-1.5 py-0.5 text-[10px] rounded font-medium',
+                            selectedPresetId === preset.id
+                              ? 'bg-background/20'
+                              : 'bg-purple-500/10 text-purple-600 dark:text-purple-500'
+                          )}>
+                            {t.presets.builtin}
+                          </span>
+                        )}
                         {/* Hardware type tag */}
                         <span className={cn(
                           'px-1.5 py-0.5 text-[10px] rounded font-medium',
@@ -450,12 +485,6 @@ export default function PresetsPage() {
                         )}>
                           {t.presets.hardware[preset.config.hardwareAccel]?.toUpperCase() || preset.config.hardwareAccel.toUpperCase()}
                         </span>
-                        {/* Built-in tag */}
-                        {preset.isBuiltin && (
-                          <span className="px-1.5 py-0.5 text-[10px] rounded bg-background/20">
-                            {t.presets.builtin}
-                          </span>
-                        )}
                       </div>
                     </div>
                   </button>
@@ -614,6 +643,7 @@ export default function PresetsPage() {
         onConfirm={handleConfirmSwitch}
         variant="destructive"
       />
+      </div>
     </div>
   )
 }

@@ -81,30 +81,24 @@ export default function HistoryPage() {
   ) || []
 
   return (
-    <div className="h-full flex flex-col">
-      {/* Header */}
-      <div className="border-b bg-background p-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold">{t.history.title}</h1>
-            <p className="text-sm text-muted-foreground">
-              {t.history.subtitle}
-            </p>
-          </div>
-          {completedTasks.length > 0 && (
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={handleClearAll}
-            >
-              {t.history.clearAll}
-            </Button>
-          )}
+    <div className="flex flex-1 flex-col">
+      <div className="page-header flex items-start justify-between">
+        <div>
+          <h1>{t.history.title}</h1>
+          <p>{t.history.subtitle}</p>
         </div>
+        {completedTasks.length > 0 && (
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={handleClearAll}
+          >
+            {t.history.clearAll}
+          </Button>
+        )}
       </div>
 
-      {/* Content */}
-      <div className="flex-1 overflow-hidden p-4">
+      <div className="flex-1 min-h-0">
         <div className="h-full flex flex-col">
           <div className="mb-4 flex items-center gap-6">
             <div className="flex items-center gap-2">

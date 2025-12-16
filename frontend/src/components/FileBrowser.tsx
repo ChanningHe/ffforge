@@ -18,10 +18,11 @@ interface FileBrowserProps {
 }
 
 export default function FileBrowser({ onFilesSelected, selectedFiles, onStartTranscode }: FileBrowserProps) {
-  const [currentPath, setCurrentPath] = useState('')
+  const { t, fileBrowserPath, setFileBrowserPath } = useApp()
+  const currentPath = fileBrowserPath
+  const setCurrentPath = setFileBrowserPath
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set(['']))
   const [videoInfoDialogOpen, setVideoInfoDialogOpen] = useState(false)
-  const { t } = useApp()
 
   const { data: files, isLoading } = useQuery({
     queryKey: ['files', currentPath],

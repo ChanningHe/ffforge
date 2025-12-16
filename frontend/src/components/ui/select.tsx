@@ -1,11 +1,12 @@
 // Custom Select component with better design
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, ReactNode } from 'react'
 import { ChevronDown, Check } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface SelectOption {
   value: string
   label: string
+  tags?: ReactNode // Optional tags to display
 }
 
 interface SelectProps {
@@ -65,14 +66,19 @@ export function Select({ value, onChange, options, placeholder, className }: Sel
                 setIsOpen(false)
               }}
               className={cn(
-                'w-full flex items-center justify-between px-2 py-2.5 text-xs',
+                'w-full flex items-center gap-2 px-2 py-2.5 text-xs',
                 'hover:bg-accent transition-colors',
                 value === option.value && 'bg-accent'
               )}
             >
-              <span>{option.label}</span>
+              <span className="truncate flex-1">{option.label}</span>
+              {option.tags && (
+                <div className="flex items-center gap-1 flex-shrink-0 ml-auto">
+                  {option.tags}
+                </div>
+              )}
               {value === option.value && (
-                <Check className="w-4 h-4 text-primary" />
+                <Check className="w-4 h-4 text-primary flex-shrink-0" />
               )}
             </button>
           ))}

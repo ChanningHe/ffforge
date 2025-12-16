@@ -36,20 +36,40 @@ func (fs *FFmpegService) ProbeFile(filePath string) (*ffprobe.VideoInfo, error) 
 
 // BuildCommand builds an FFmpeg command based on configuration
 func (fs *FFmpegService) BuildCommand(ctx context.Context, sourceFile, outputFile string, config *model.TranscodeConfig) *exec.Cmd {
-	args := []string{
-		"-i", sourceFile,
-		"-y", // Overwrite output file
-	}
+	args := []string{}
 
 	// Check if using advanced mode (custom CLI)
 	if config.Mode == "advanced" && config.CustomCommand != "" {
 		// Advanced mode: use custom command parameters
-		customArgs := parseExtraParams(config.CustomCommand)
+		// Support [[INPUT]] and [[OUTPUT]] placeholders
+		customCmd := config.CustomCommand
+		customCmd = strings.ReplaceAll(customCmd, "[[INPUT]]", sourceFile)
+		customCmd = strings.ReplaceAll(customCmd, "[[OUTPUT]]", outputFile)
+
+		customArgs := parseExtraParams(customCmd)
+
+		// If no [[INPUT]] placeholder found, add input file before custom args
+		if !strings.Contains(config.CustomCommand, "[[INPUT]]") {
+			args = append(args, "-i", sourceFile)
+		}
+
 		args = append(args, customArgs...)
+
+		// If no [[OUTPUT]] placeholder found, add output file at the end
+		if !strings.Contains(config.CustomCommand, "[[OUTPUT]]") {
+			args = append(args, "-y") // Overwrite output file
+			// Progress reporting before output file
+			args = append(args, "-progress", "pipe:2")
+			args = append(args, outputFile)
+		}
 	} else {
 		// Simple mode: use UI-based configuration
-		// Add hardware acceleration flags
+		// IMPORTANT: Hardware acceleration flags must come BEFORE -i input file
 		args = append(args, fs.buildHardwareAccelArgs(config.HardwareAccel)...)
+
+		// Add input file
+		args = append(args, "-i", sourceFile)
+		args = append(args, "-y") // Overwrite output file
 
 		// Add video encoding args
 		args = append(args, fs.buildVideoArgs(config)...)
@@ -63,13 +83,13 @@ func (fs *FFmpegService) BuildCommand(ctx context.Context, sourceFile, outputFil
 			extraArgs := parseExtraParams(config.ExtraParams)
 			args = append(args, extraArgs...)
 		}
+
+		// Add progress reporting
+		args = append(args, "-progress", "pipe:2")
+
+		// Output file
+		args = append(args, outputFile)
 	}
-
-	// Add progress reporting
-	args = append(args, "-progress", "pipe:2")
-
-	// Output file
-	args = append(args, outputFile)
 
 	cmd := exec.CommandContext(ctx, fs.ffmpegPath, args...)
 	return cmd
@@ -124,14 +144,14 @@ func (fs *FFmpegService) buildHardwareAccelArgs(hwAccel string) []string {
 }
 
 // buildVideoArgs builds video encoding arguments
-// 
+//
 // Preset parameter usage varies by encoder:
-// - libx265 (H.265 CPU): uses -preset with values: ultrafast, superfast, veryfast, faster, fast, medium, slow, slower, veryslow
-// - libsvtav1 (AV1 CPU): uses -preset with values 0-13 (0=slowest/best quality, 13=fastest/lower quality)
-//   Common values: 2-4 (high quality), 5-7 (balanced), 8-10 (fast)
-// - NVIDIA NVENC: uses -preset with values: p1-p7, or quality presets (slow, medium, fast)
-// - Intel QSV: uses -preset with standard values (slow, medium, fast, etc.)
-// - AMD AMF: uses -quality with values: quality, balanced, speed
+//   - libx265 (H.265 CPU): uses -preset with values: ultrafast, superfast, veryfast, faster, fast, medium, slow, slower, veryslow
+//   - libsvtav1 (AV1 CPU): uses -preset with values 0-13 (0=slowest/best quality, 13=fastest/lower quality)
+//     Common values: 2-4 (high quality), 5-7 (balanced), 8-10 (fast)
+//   - NVIDIA NVENC: uses -preset with values: p1-p7, or quality presets (slow, medium, fast)
+//   - Intel QSV: uses -preset with standard values (slow, medium, fast, etc.)
+//   - AMD AMF: uses -quality with values: quality, balanced, speed
 func (fs *FFmpegService) buildVideoArgs(config *model.TranscodeConfig) []string {
 	args := []string{}
 
@@ -153,7 +173,7 @@ func (fs *FFmpegService) buildVideoArgs(config *model.TranscodeConfig) []string 
 				args = append(args, "-preset", "medium") // libx265 default
 			}
 		}
-		
+
 		if config.Video.CRF > 0 {
 			args = append(args, "-crf", strconv.Itoa(config.Video.CRF))
 		}
@@ -317,13 +337,13 @@ func (fs *FFmpegService) GenerateOutputPath(sourceFile string, config *model.Tra
 
 // ProgressUpdate represents a progress update from FFmpeg
 type ProgressUpdate struct {
-	Frame       int
-	FPS         float64
-	Bitrate     string
-	TotalSize   int64
-	OutTime     float64 // Time in seconds
-	Speed       float64
-	Progress    string
+	Frame     int
+	FPS       float64
+	Bitrate   string
+	TotalSize int64
+	OutTime   float64 // Time in seconds
+	Speed     float64
+	Progress  string
 }
 
 // ParseProgress parses FFmpeg progress output
@@ -409,7 +429,7 @@ func StreamProgress(scanner *bufio.Scanner, progressChan chan<- *ProgressUpdate)
 
 	for scanner.Scan() {
 		line := scanner.Text()
-		
+
 		update, err := ParseProgress(line)
 		if err != nil {
 			continue
@@ -441,11 +461,11 @@ func StreamProgress(scanner *bufio.Scanner, progressChan chan<- *ProgressUpdate)
 		// Send update if we have progress
 		if currentUpdate.Progress == "continue" || currentUpdate.Progress == "end" {
 			progressChan <- currentUpdate
-			
+
 			if currentUpdate.Progress == "end" {
 				break
 			}
-			
+
 			// Reset for next update
 			currentUpdate = &ProgressUpdate{}
 		}
@@ -453,4 +473,3 @@ func StreamProgress(scanner *bufio.Scanner, progressChan chan<- *ProgressUpdate)
 
 	close(progressChan)
 }
-

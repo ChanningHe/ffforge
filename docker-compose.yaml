@@ -1,17 +1,18 @@
 services:
   ffforge:
-    container_name: channinghe/ffforge:latest
+    container_name: ffforge
+    image: channinghe/ffforge:latest
     restart: unless-stopped
     ports:
       - "38110:8080"
     volumes:
       - /your/media/path:/data
       # Mount output directory
-      - ./ffweb/output:/output
+      - ./ffforge/output:/output
       # Mount config directory
-      - ./ffweb/config:/app/config
+      - ./ffforge/config:/app/config
       # Mount database directory
-      - ./ffweb/database:/app/database
+      #- ./ffforge/config/database:/app/config/database
       # Optional: Mount custom FFmpeg binary (uncomment if needed)
       # - /path/to/your/ffmpeg:/usr/local/bin/ffmpeg:ro
       # - /path/to/your/ffprobe:/usr/local/bin/ffprobe:ro
@@ -21,14 +22,19 @@ services:
       - DATA_PATH=/data
       - OUTPUT_PATH=/output
       - CONFIG_PATH=/app/config
-      - DATABASE_PATH=/app/database/ffmpeg-web.db
+      - DATABASE_PATH=/app/config/database/ffforge.db
       # CORS
       - CORS_ORIGINS=http://localhost:3000
       # FFmpeg paths (default: /usr/local/bin/ffmpeg and /usr/local/bin/ffprobe)
       # Override these if you mount custom binaries elsewhere
       - FFMPEG_PATH=/usr/local/bin/ffmpeg
       - FFPROBE_PATH=/usr/local/bin/ffprobe
-
+    # Intel GPU
+    # Use command "getent group render | cut -d: -f3" to get the group id
+    # group_add:
+    #   - 'gid-from-command'
+    # devices:
+    #   - /dev/dri/renderD128:/dev/dri/renderD128
 networks:
   ffweb-network:
     driver: bridge

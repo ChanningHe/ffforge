@@ -1,43 +1,83 @@
 import { Outlet } from 'react-router-dom'
-import Sidebar from './Sidebar'
-import { useState, useEffect } from 'react'
+import { Languages, Sun, Moon, Monitor } from 'lucide-react'
+import { AppSidebar } from './app-sidebar'
+import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar'
+import { Button } from '@/components/ui/button'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import { useApp } from '@/contexts/AppContext'
 
 export default function Layout() {
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const { t, setLanguage, theme, setTheme } = useApp()
 
-  // Auto-collapse sidebar on small screens
-  useEffect(() => {
-    const handleResize = () => {
-      // Auto-collapse on screens smaller than 1280px (xl breakpoint)
-      if (window.innerWidth < 1280) {
-        setSidebarCollapsed(true)
-      } else if (window.innerWidth >= 1536) {
-        // Auto-expand on screens larger than 1536px (2xl breakpoint)
-        setSidebarCollapsed(false)
-      }
-    }
+  const themeIcons = {
+    light: Sun,
+    dark: Moon,
+    system: Monitor,
+  }
 
-    // Run on mount
-    handleResize()
-
-    // Listen to window resize
-    window.addEventListener('resize', handleResize)
-    return () => window.removeEventListener('resize', handleResize)
-  }, [])
+  const ThemeIcon = themeIcons[theme]
 
   return (
-    <div className="flex h-screen overflow-hidden">
-      {/* Sidebar */}
-      <Sidebar 
-        collapsed={sidebarCollapsed} 
-        onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} 
-      />
-      
-      {/* Main Content */}
-      <main className="flex-1 overflow-auto">
-        <Outlet />
-      </main>
-    </div>
+    <SidebarProvider>
+      <AppSidebar />
+      <SidebarInset>
+        <header className="flex h-14 shrink-0 items-center justify-between gap-2 border-b bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/60 sticky top-0 z-10 px-6 rounded-t-xl">
+          <SidebarTrigger className="-ml-1" />
+          
+          <div className="flex items-center gap-2">
+            {/* Language Selector */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-9 w-9">
+                  <Languages className="h-4 w-4" />
+                  <span className="sr-only">{t.settings.language}</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => setLanguage('zh')}>
+                  <span>中文</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setLanguage('en')}>
+                  <span>English</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* Theme Selector */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-9 w-9">
+                  <ThemeIcon className="h-4 w-4" />
+                  <span className="sr-only">{t.settings.theme}</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => setTheme('light')}>
+                  <Sun className="mr-2 h-4 w-4" />
+                  <span>{t.settings.themeOptions.light}</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setTheme('dark')}>
+                  <Moon className="mr-2 h-4 w-4" />
+                  <span>{t.settings.themeOptions.dark}</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setTheme('system')}>
+                  <Monitor className="mr-2 h-4 w-4" />
+                  <span>{t.settings.themeOptions.system}</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </header>
+        <div className="flex flex-1 flex-col p-6 overflow-auto">
+          <Outlet />
+        </div>
+      </SidebarInset>
+    </SidebarProvider>
   )
 }
 

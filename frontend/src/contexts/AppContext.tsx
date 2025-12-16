@@ -24,6 +24,10 @@ interface AppContextType {
   // Settings
   settings: AppSettings
   updateSettings: (settings: Partial<AppSettings>) => void
+  
+  // File Browser State
+  fileBrowserPath: string
+  setFileBrowserPath: (path: string) => void
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined)
@@ -50,6 +54,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const saved = localStorage.getItem('settings')
     return saved ? { ...DEFAULT_SETTINGS, ...JSON.parse(saved) } : DEFAULT_SETTINGS
   })
+  
+  // File browser current path state
+  const [fileBrowserPath, setFileBrowserPathState] = useState<string>(() => {
+    const saved = sessionStorage.getItem('fileBrowserPath')
+    return saved || ''
+  })
+  
+  // Save file browser path to sessionStorage
+  const setFileBrowserPath = (path: string) => {
+    setFileBrowserPathState(path)
+    sessionStorage.setItem('fileBrowserPath', path)
+  }
   
   // Get system theme preference
   const [systemTheme, setSystemTheme] = useState<'light' | 'dark'>(() => {
@@ -110,6 +126,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         resolvedTheme,
         settings,
         updateSettings,
+        fileBrowserPath,
+        setFileBrowserPath,
       }}
     >
       {children}

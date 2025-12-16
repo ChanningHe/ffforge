@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Select } from '@/components/ui/select'
+import { Slider } from '@/components/ui/slider'
 import { useApp } from '@/contexts/AppContext'
 import type { TranscodeConfig, HardwareAccel, AudioCodec, OutputPathType } from '@/types'
 
@@ -184,9 +185,39 @@ export default function ConfigPanel({ selectedFiles, onConfigChange, initialConf
     }
   }
 
+  // Get hardware type color helper
+  const getHardwareColor = (hw: string) => {
+    switch (hw) {
+      case 'nvidia':
+        return 'bg-green-500/10 text-green-600 dark:text-green-500'
+      case 'intel':
+        return 'bg-blue-500/10 text-blue-600 dark:text-blue-500'
+      case 'amd':
+        return 'bg-red-500/10 text-red-600 dark:text-red-500'
+      case 'cpu':
+      default:
+        return 'bg-gray-500/10 text-gray-600 dark:text-gray-500'
+    }
+  }
+
   const presetOptions = [
     { value: '', label: t.config.custom },
-    ...(presets?.map(p => ({ value: p.id, label: p.name })) || [])
+    ...(presets?.map(p => ({
+      value: p.id,
+      label: p.name,
+      tags: (
+        <>
+          {p.isBuiltin && (
+            <span className="px-1.5 py-0.5 text-[10px] rounded font-medium bg-purple-500/10 text-purple-600 dark:text-purple-500">
+              {t.presets.builtin}
+            </span>
+          )}
+          <span className={`px-1.5 py-0.5 text-[10px] rounded font-medium ${getHardwareColor(p.config.hardwareAccel)}`}>
+            {t.presets.hardware[p.config.hardwareAccel]?.toUpperCase() || p.config.hardwareAccel.toUpperCase()}
+          </span>
+        </>
+      )
+    })) || [])
   ]
 
   return (
@@ -292,24 +323,22 @@ export default function ConfigPanel({ selectedFiles, onConfigChange, initialConf
 
             {/* CRF - Full width */}
             <div>
-              <div className="flex justify-between items-center mb-1">
+              <div className="flex justify-between items-center mb-1.5">
                 <label className="text-[11px] font-medium text-muted-foreground">
                   {t.config.quality}
                 </label>
                 <span className="text-xs font-mono">{config.video.crf}</span>
               </div>
-              <input
-                type="range"
-                min="0"
-                max="51"
-                value={config.video.crf}
-                onChange={(e) => setConfig({
+              <Slider
+                min={0}
+                max={51}
+                value={config.video.crf || 23}
+                onChange={(val) => setConfig({
                   ...config,
-                  video: { ...config.video, crf: parseInt(e.target.value) }
+                  video: { ...config.video, crf: val }
                 })}
-                className="w-full h-1.5"
               />
-              <p className="text-[10px] text-muted-foreground mt-0.5">
+              <p className="text-[10px] text-muted-foreground mt-1">
                 {t.config.qualityHint}
               </p>
             </div>
@@ -482,15 +511,38 @@ export default function ConfigPanel({ selectedFiles, onConfigChange, initialConf
                   ...config,
                   customCommand: e.target.value
                 })}
-                placeholder="-c:v libsvtav1 -preset 4 -crf 30 -c:a copy"
+                placeholder={language === 'zh' 
+                  ? "-hwaccel qsv -hwaccel_output_format qsv -i [[INPUT]] -c:v hevc_qsv -preset medium -global_quality 23 -c:a copy [[OUTPUT]]"
+                  : "-hwaccel qsv -hwaccel_output_format qsv -i [[INPUT]] -c:v hevc_qsv -preset medium -global_quality 23 -c:a copy [[OUTPUT]]"
+                }
                 rows={8}
               />
-              <p className="text-[10px] text-muted-foreground mt-0.5">
-                {language === 'zh' 
-                  ? '输入完整的 FFmpeg 参数（输入和输出文件会自动添加）。例如：-c:v libx265 -preset medium -crf 23 -c:a aac -b:a 192k'
-                  : 'Enter complete FFmpeg parameters (input and output files will be added automatically). Example: -c:v libx265 -preset medium -crf 23 -c:a aac -b:a 192k'
-                }
-              </p>
+              <div className="text-[10px] text-muted-foreground mt-0.5 space-y-1">
+                <p>
+                  {language === 'zh' 
+                    ? '💡 使用 [[INPUT]] 和 [[OUTPUT]] 作为占位符，它们会在运行时被替换为实际的文件路径。'
+                    : '💡 Use [[INPUT]] and [[OUTPUT]] as placeholders, they will be replaced with actual file paths at runtime.'
+                  }
+                </p>
+                <p className="font-medium text-primary">
+                  {language === 'zh' 
+                    ? '⚠️ 注意：使用 GPU 时，-hwaccel 参数必须放在 -i [[INPUT]] 之前！'
+                    : '⚠️ Note: When using GPU, -hwaccel parameters must come BEFORE -i [[INPUT]]!'
+                  }
+                </p>
+                <p>
+                  {language === 'zh' 
+                    ? '示例 NVIDIA：-hwaccel cuda -i [[INPUT]] -c:v hevc_nvenc -preset p4 -cq 23 -c:a copy [[OUTPUT]]'
+                    : 'Example NVIDIA: -hwaccel cuda -i [[INPUT]] -c:v hevc_nvenc -preset p4 -cq 23 -c:a copy [[OUTPUT]]'
+                  }
+                </p>
+                <p>
+                  {language === 'zh' 
+                    ? '示例 Intel QSV：-hwaccel qsv -hwaccel_output_format qsv -i [[INPUT]] -c:v hevc_qsv -preset medium -global_quality 23 -c:a copy [[OUTPUT]]'
+                    : 'Example Intel QSV: -hwaccel qsv -hwaccel_output_format qsv -i [[INPUT]] -c:v hevc_qsv -preset medium -global_quality 23 -c:a copy [[OUTPUT]]'
+                  }
+                </p>
+              </div>
             </div>
 
             <div className="border-t pt-2" />

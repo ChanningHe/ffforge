@@ -21,11 +21,11 @@ var upgrader = websocket.Upgrader{
 
 // WebSocketHandler handles WebSocket connections for progress updates
 type WebSocketHandler struct {
-	clients     map[*websocket.Conn]bool
-	broadcast   chan *worker.ProgressUpdate
-	register    chan *websocket.Conn
-	unregister  chan *websocket.Conn
-	mu          sync.RWMutex
+	clients    map[*websocket.Conn]bool
+	broadcast  chan *worker.ProgressUpdate
+	register   chan *websocket.Conn
+	unregister chan *websocket.Conn
+	mu         sync.RWMutex
 }
 
 // NewWebSocketHandler creates a new WebSocket handler
@@ -91,13 +91,10 @@ func (h *WebSocketHandler) HandleWebSocket(c *gin.Context) {
 		ticker := time.NewTicker(30 * time.Second)
 		defer ticker.Stop()
 
-		for {
-			select {
-			case <-ticker.C:
-				if err := conn.WriteMessage(websocket.PingMessage, nil); err != nil {
-					h.unregister <- conn
-					return
-				}
+		for range ticker.C {
+			if err := conn.WriteMessage(websocket.PingMessage, nil); err != nil {
+				h.unregister <- conn
+				return
 			}
 		}
 	}()
@@ -125,4 +122,3 @@ func (h *WebSocketHandler) BroadcastProgress(update *worker.ProgressUpdate) {
 func (h *WebSocketHandler) GetBroadcastChannel() chan<- *worker.ProgressUpdate {
 	return h.broadcast
 }
-
