@@ -127,10 +127,10 @@ export default function TranscodePage() {
     onSuccess: (tasks) => {
       queryClient.invalidateQueries({ queryKey: ['tasks'] })
       setSelectedFiles([])
-      showToast(`成功创建 ${tasks.length} 个转码任务`, 'success')
+      showToast(t.transcode.tasksCreated.replace('{count}', tasks.length.toString()), 'success')
     },
     onError: () => {
-      showToast('创建任务失败', 'error')
+      showToast(t.transcode.createTasksFailed, 'error')
     },
   })
 

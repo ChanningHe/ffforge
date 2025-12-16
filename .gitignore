@@ -39,4 +39,4 @@ Thumbs.db
 logs/
 
 # Dev
-devfile/*
+devfile/

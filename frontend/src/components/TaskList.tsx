@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Trash2, X } from 'lucide-react'
 import { api } from '@/lib/api'
 import { useWebSocket } from '@/hooks/useWebSocket'
+import { useApp } from '@/contexts/AppContext'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
@@ -26,18 +27,8 @@ const getStatusVariant = (status: TaskStatus): "default" | "secondary" | "destru
   }
 }
 
-const getStatusText = (status: TaskStatus): string => {
-  const statusMap: Record<TaskStatus, string> = {
-    pending: '等待中',
-    running: '转码中',
-    completed: '已完成',
-    failed: '失败',
-    cancelled: '已取消',
-  }
-  return statusMap[status] || status
-}
-
 export default function TaskList() {
+  const { t } = useApp()
   const queryClient = useQueryClient()
   const { showToast } = useToast()
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
@@ -85,10 +76,10 @@ export default function TaskList() {
     mutationFn: (id: string) => api.deleteTask(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tasks'] })
-      showToast('任务已删除', 'success')
+      showToast(t.tasks.taskDeleted, 'success')
     },
     onError: () => {
-      showToast('删除失败', 'error')
+      showToast(t.tasks.deleteFailed, 'error')
     },
   })
 
@@ -96,10 +87,10 @@ export default function TaskList() {
     mutationFn: (id: string) => api.cancelTask(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tasks'] })
-      showToast('任务已取消', 'success')
+      showToast(t.tasks.taskCancelled, 'success')
     },
     onError: () => {
-      showToast('取消失败', 'error')
+      showToast(t.tasks.cancelFailed, 'error')
     },
   })
 
@@ -138,11 +129,11 @@ export default function TaskList() {
         <div className="flex gap-6">
           <div className="flex items-center gap-2">
             <div className="h-3 w-3 rounded-full bg-primary animate-pulse"></div>
-            <span className="text-sm">转码中: {runningTasks.length}</span>
+            <span className="text-sm">{t.tasks.runningCount}: {runningTasks.length}</span>
           </div>
           <div className="flex items-center gap-2">
             <div className="h-3 w-3 rounded-full bg-muted"></div>
-            <span className="text-sm">等待中: {pendingTasks.length}</span>
+            <span className="text-sm">{t.tasks.pendingCount}: {pendingTasks.length}</span>
           </div>
         </div>
       </div>
@@ -150,13 +141,13 @@ export default function TaskList() {
       <div className="flex-1 overflow-auto border rounded-lg bg-card">
         {isLoading ? (
           <div className="flex items-center justify-center h-32">
-            <p className="text-muted-foreground">加载中...</p>
+            <p className="text-muted-foreground">{t.common.loading}</p>
           </div>
         ) : (
           <div className="space-y-3 p-4">
             {activeTasks.length === 0 ? (
               <p className="text-center text-muted-foreground py-8">
-                暂无进行中的任务
+                {t.tasks.noTasks}
               </p>
             ) : (
               activeTasks.map((task) => (
@@ -166,11 +157,11 @@ export default function TaskList() {
                     <div className="flex-1 min-w-0">
                       <p className="font-medium truncate">{task.sourceFile}</p>
                       <p className="text-sm text-muted-foreground truncate">
-                        {task.outputFile || '输出路径待定'}
+                        {task.outputFile || t.tasks.outputPending}
                       </p>
                     </div>
                     <Badge variant={getStatusVariant(task.status)}>
-                      {getStatusText(task.status)}
+                      {t.tasks.status[task.status]}
                     </Badge>
                   </div>
 
@@ -181,9 +172,9 @@ export default function TaskList() {
                         <span>{task.progress.toFixed(1)}%</span>
                         {task.speed > 0 && (
                           <>
-                            <span>速度: {formatSpeed(task.speed)}</span>
+                            <span>{t.tasks.speed}: {formatSpeed(task.speed)}</span>
                             {task.eta > 0 && (
-                              <span>剩余: {formatDuration(task.eta)}</span>
+                              <span>{t.tasks.eta}: {formatDuration(task.eta)}</span>
                             )}
                           </>
                         )}
@@ -203,7 +194,7 @@ export default function TaskList() {
                         onClick={() => handleCancel(task.id)}
                       >
                         <X className="h-4 w-4 mr-1" />
-                        取消
+                        {t.tasks.cancel}
                       </Button>
                     )}
                     {(task.status === 'completed' || task.status === 'failed' || task.status === 'cancelled') && (
@@ -213,7 +204,7 @@ export default function TaskList() {
                         onClick={() => handleDelete(task.id)}
                       >
                         <Trash2 className="h-4 w-4 mr-1" />
-                        删除
+                        {t.common.delete}
                       </Button>
                     )}
                   </div>
@@ -229,10 +220,10 @@ export default function TaskList() {
       <ConfirmDialog
         open={deleteConfirmOpen}
         onOpenChange={setDeleteConfirmOpen}
-        title="删除任务"
-        description="确定要删除此任务吗？"
-        confirmText="删除"
-        cancelText="取消"
+        title={t.tasks.deleteTask}
+        description={t.tasks.deleteTaskConfirm}
+        confirmText={t.common.delete}
+        cancelText={t.common.cancel}
         onConfirm={handleConfirmDelete}
         variant="destructive"
       />
@@ -241,10 +232,10 @@ export default function TaskList() {
       <ConfirmDialog
         open={cancelConfirmOpen}
         onOpenChange={setCancelConfirmOpen}
-        title="取消任务"
-        description="确定要取消此任务吗？正在进行的转码将被中止。"
-        confirmText="取消任务"
-        cancelText="返回"
+        title={t.tasks.cancelTask}
+        description={t.tasks.cancelTaskConfirm}
+        confirmText={t.tasks.cancelTaskButton}
+        cancelText={t.tasks.back}
         onConfirm={handleConfirmCancel}
         variant="destructive"
       />

@@ -14,20 +14,28 @@ export const translations = {
     },
     // Home page
     home: {
-      title: 'FFForge',
-      subtitle: 'Modern video transcoding platform',
+      title: 'Welcome to FFForge',
+      subtitle: 'Powerful video transcoding solution with H.265/AV1 encoding, hardware acceleration, and batch processing',
       quickStart: 'Quick Start',
+      transcode: {
+        title: 'Video Transcoding',
+        description: 'Browse server files and configure transcoding parameters',
+        button: 'Start Transcoding',
+      },
+      tasks: {
+        title: 'Task Management',
+        description: 'View and manage transcoding task progress',
+        button: 'View Tasks',
+      },
+      hardware: {
+        title: 'Hardware Acceleration',
+        description: 'Support for CPU, NVIDIA, Intel QSV, AMD',
+        button: 'View Hardware',
+      },
       features: {
         title: 'Features',
-        batch: 'Batch Processing',
-        batchDesc: 'Select and transcode multiple videos at once',
-        hardware: 'Hardware Acceleration',
-        hardwareDesc: 'Support for NVIDIA, Intel QSV, and AMD acceleration',
-        formats: 'Multiple Formats',
-        formatsDesc: 'Support H.265, AV1, and various output formats',
-        realtime: 'Real-time Progress',
-        realtimeDesc: 'Monitor transcoding progress in real-time via WebSocket',
       },
+      github: 'GitHub Repository',
     },
     // Transcode page
     transcode: {
@@ -49,6 +57,8 @@ export const translations = {
       bitrate: 'Bitrate',
       fps: 'Frame Rate',
       loading: 'Loading...',
+      tasksCreated: 'Successfully created {count} transcoding task(s)',
+      createTasksFailed: 'Failed to create tasks',
     },
     // Configuration panel
     config: {
@@ -109,6 +119,20 @@ export const translations = {
       speed: 'Speed',
       eta: 'ETA',
       cancel: 'Cancel',
+      runningCount: 'Running',
+      pendingCount: 'Pending',
+      outputPending: 'Output path pending',
+      deleteTask: 'Delete Task',
+      deleteTaskConfirm: 'Are you sure you want to delete this task?',
+      cancelTask: 'Cancel Task',
+      cancelTaskConfirm: 'Are you sure you want to cancel this task? The ongoing transcoding will be aborted.',
+      cancelTaskButton: 'Cancel Task',
+      back: 'Back',
+      taskDeleted: 'Task deleted',
+      deleteFailed: 'Delete failed',
+      taskCancelled: 'Task cancelled',
+      cancelFailed: 'Cancel failed',
+      createTaskFailed: 'Failed to create task',
     },
     // History page
     history: {
@@ -117,6 +141,18 @@ export const translations = {
       noHistory: 'No history records',
       clearAll: 'Clear All',
       delete: 'Delete',
+      deleteRecord: 'Delete Record',
+      deleteRecordConfirm: 'Are you sure you want to delete this record?',
+      clearAllRecords: 'Clear All History',
+      clearAllConfirm: 'Are you sure you want to clear all history records? This action cannot be undone.',
+      clearAllButton: 'Clear',
+      recordDeleted: 'Record deleted',
+      deleteFailed: 'Delete failed',
+      completedCount: 'Completed',
+      failedCount: 'Failed',
+      outputPending: 'Output path pending',
+      completedAt: 'Completed at',
+      duration: 'Duration',
     },
     // Settings page
     settings: {
@@ -154,6 +190,12 @@ export const translations = {
       presetConfig: 'Configuration',
       builtin: 'Built-in',
       custom: 'Custom',
+      hardware: {
+        cpu: 'CPU',
+        nvidia: 'NVIDIA',
+        intel: 'Intel',
+        amd: 'AMD',
+      },
       deleteConfirm: 'Are you sure you want to delete this preset?',
       importSuccess: 'Presets imported successfully',
       exportSuccess: 'Presets exported successfully',
@@ -194,20 +236,28 @@ export const translations = {
     },
     // 首页
     home: {
-      title: 'FFForge',
-      subtitle: '现代化视频转码平台',
+      title: '欢迎使用 FFForge',
+      subtitle: '强大的视频转码解决方案，支持 H.265/AV1 编码、硬件加速和批量处理',
       quickStart: '快速开始',
+      transcode: {
+        title: '视频转码',
+        description: '浏览服务器文件并配置转码参数',
+        button: '开始转码',
+      },
+      tasks: {
+        title: '任务管理',
+        description: '查看和管理转码任务进度',
+        button: '查看任务',
+      },
+      hardware: {
+        title: '硬件加速',
+        description: '支持 CPU、NVIDIA、Intel QSV、AMD',
+        button: '查看硬件',
+      },
       features: {
         title: '功能特性',
-        batch: '批量处理',
-        batchDesc: '一次选择并转码多个视频',
-        hardware: '硬件加速',
-        hardwareDesc: '支持 NVIDIA、Intel QSV 和 AMD 加速',
-        formats: '多种格式',
-        formatsDesc: '支持 H.265、AV1 及各种输出格式',
-        realtime: '实时进度',
-        realtimeDesc: '通过 WebSocket 实时监控转码进度',
       },
+      github: 'GitHub 仓库',
     },
     // 转码页面
     transcode: {
@@ -229,6 +279,8 @@ export const translations = {
       bitrate: '比特率',
       fps: '帧率',
       loading: '加载中...',
+      tasksCreated: '成功创建 {count} 个转码任务',
+      createTasksFailed: '创建任务失败',
     },
     // 配置面板
     config: {
@@ -280,7 +332,7 @@ export const translations = {
       noTasks: '没有运行中的任务',
       status: {
         pending: '等待中',
-        running: '运行中',
+        running: '转码中',
         completed: '已完成',
         failed: '失败',
         cancelled: '已取消',
@@ -289,6 +341,20 @@ export const translations = {
       speed: '速度',
       eta: '预计剩余',
       cancel: '取消',
+      runningCount: '转码中',
+      pendingCount: '等待中',
+      outputPending: '输出路径待定',
+      deleteTask: '删除任务',
+      deleteTaskConfirm: '确定要删除此任务吗？',
+      cancelTask: '取消任务',
+      cancelTaskConfirm: '确定要取消此任务吗？正在进行的转码将被中止。',
+      cancelTaskButton: '取消任务',
+      back: '返回',
+      taskDeleted: '任务已删除',
+      deleteFailed: '删除失败',
+      taskCancelled: '任务已取消',
+      cancelFailed: '取消失败',
+      createTaskFailed: '创建任务失败',
     },
     // 历史页面
     history: {
@@ -297,6 +363,18 @@ export const translations = {
       noHistory: '没有历史记录',
       clearAll: '清空全部',
       delete: '删除',
+      deleteRecord: '删除记录',
+      deleteRecordConfirm: '确定要删除此记录吗？',
+      clearAllRecords: '清空所有历史记录',
+      clearAllConfirm: '确定要清空所有历史记录吗？此操作不可恢复。',
+      clearAllButton: '清空',
+      recordDeleted: '记录已删除',
+      deleteFailed: '删除失败',
+      completedCount: '已完成',
+      failedCount: '失败',
+      outputPending: '输出路径待定',
+      completedAt: '完成时间',
+      duration: '用时',
     },
     // 设置页面
     settings: {
@@ -334,6 +412,12 @@ export const translations = {
       presetConfig: '配置',
       builtin: '内置',
       custom: '自定义',
+      hardware: {
+        cpu: 'CPU',
+        nvidia: 'NVIDIA',
+        intel: 'Intel',
+        amd: 'AMD',
+      },
       deleteConfirm: '确定要删除此预设吗？',
       importSuccess: '预设导入成功',
       exportSuccess: '预设导出成功',

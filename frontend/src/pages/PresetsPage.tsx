@@ -395,37 +395,72 @@ export default function PresetsPage() {
                         {presetDescription || 'New preset'}
                       </div>
                     </div>
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                      {/* Hardware type tag */}
+                      <span className="px-1.5 py-0.5 text-[10px] rounded font-medium bg-background/20 text-primary">
+                        {t.presets.hardware[presetConfig.hardwareAccel]?.toUpperCase() || presetConfig.hardwareAccel.toUpperCase()}
+                      </span>
+                    </div>
                   </div>
                 </div>
               )}
               
               {/* Preset list */}
-              {presets.map((preset) => (
-                <button
-                  key={preset.id}
-                  onClick={() => handleSelectPreset(preset.id)}
-                  className={cn(
-                    'w-full text-left px-3 py-2.5 rounded-lg transition-colors',
-                    selectedPresetId === preset.id
-                      ? 'bg-primary text-primary-foreground'
-                      : 'hover:bg-accent'
-                  )}
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex-1 min-w-0">
-                      <div className="font-medium text-sm truncate">{preset.name}</div>
-                      <div className="text-xs opacity-80 mt-0.5 h-[1.25rem] overflow-hidden truncate">
-                        {preset.description || '\u00A0'}
+              {presets.map((preset) => {
+                // Get hardware type color
+                const getHardwareColor = (hw: string) => {
+                  switch (hw) {
+                    case 'nvidia':
+                      return 'bg-green-500/20 text-green-700 dark:text-green-400'
+                    case 'intel':
+                      return 'bg-blue-500/20 text-blue-700 dark:text-blue-400'
+                    case 'amd':
+                      return 'bg-red-500/20 text-red-700 dark:text-red-400'
+                    case 'cpu':
+                    default:
+                      return 'bg-gray-500/20 text-gray-700 dark:text-gray-400'
+                  }
+                }
+                
+                return (
+                  <button
+                    key={preset.id}
+                    onClick={() => handleSelectPreset(preset.id)}
+                    className={cn(
+                      'w-full text-left px-3 py-2.5 rounded-lg transition-colors',
+                      selectedPresetId === preset.id
+                        ? 'bg-primary text-primary-foreground'
+                        : 'hover:bg-accent'
+                    )}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium text-sm truncate">{preset.name}</div>
+                        <div className="text-xs opacity-80 mt-0.5 h-[1.25rem] overflow-hidden truncate">
+                          {preset.description || '\u00A0'}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        {/* Hardware type tag */}
+                        <span className={cn(
+                          'px-1.5 py-0.5 text-[10px] rounded font-medium',
+                          selectedPresetId === preset.id
+                            ? 'bg-background/20'
+                            : getHardwareColor(preset.config.hardwareAccel)
+                        )}>
+                          {t.presets.hardware[preset.config.hardwareAccel]?.toUpperCase() || preset.config.hardwareAccel.toUpperCase()}
+                        </span>
+                        {/* Built-in tag */}
+                        {preset.isBuiltin && (
+                          <span className="px-1.5 py-0.5 text-[10px] rounded bg-background/20">
+                            {t.presets.builtin}
+                          </span>
+                        )}
                       </div>
                     </div>
-                    {preset.isBuiltin && (
-                      <span className="px-1.5 py-0.5 text-[10px] rounded bg-background/20 flex-shrink-0">
-                        {t.presets.builtin}
-                      </span>
-                    )}
-                  </div>
-                </button>
-              ))}
+                  </button>
+                )
+              })}
             </div>
           )}
         </div>
