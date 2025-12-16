@@ -1,0 +1,105 @@
+// File types
+export interface FileInfo {
+  name: string
+  path: string
+  isDir: boolean
+  size: number
+  modTime: string
+  // Video specific
+  duration?: number
+  width?: number
+  height?: number
+  codec?: string
+  bitrate?: number
+  profile?: string
+  frameRate?: string // Frame rate as string (e.g., "24000/1001" or "30")
+  pixelFormat?: string
+  colorSpace?: string
+  colorTransfer?: string
+  isHDR?: boolean
+}
+
+// Task types
+export type TaskStatus = 'pending' | 'running' | 'completed' | 'failed' | 'cancelled'
+
+export interface Task {
+  id: string
+  sourceFile: string
+  outputFile: string
+  status: TaskStatus
+  progress: number
+  speed: number
+  eta: number
+  error?: string
+  createdAt: string
+  startedAt?: string
+  completedAt?: string
+  preset?: string
+  config: TranscodeConfig
+}
+
+// Transcode configuration
+export type EncoderType = 'h265' | 'av1'
+export type HardwareAccel = 'cpu' | 'nvidia' | 'intel' | 'amd'
+export type AudioCodec = 'copy' | 'aac' | 'opus' | 'mp3'
+export type OutputPathType = 'source' | 'custom' | 'default' | 'overwrite'
+
+export interface TranscodeConfig {
+  mode?: 'simple' | 'advanced' // Configuration mode (default: simple)
+  
+  // Simple mode fields (UI-based configuration)
+  encoder: EncoderType
+  hardwareAccel: HardwareAccel
+  video: {
+    crf?: number
+    preset?: string
+    resolution?: string
+    fps?: string | number
+    bitrate?: string
+  }
+  audio: {
+    codec: AudioCodec
+    bitrate?: string
+    channels?: number
+  }
+  output: {
+    container: string
+    suffix: string
+    pathType: OutputPathType
+    customPath?: string
+  }
+  extraParams?: string // Extra FFmpeg parameters
+  
+  // Advanced mode field (custom CLI parameters)
+  customCommand?: string // Custom FFmpeg CLI parameters (between input and output)
+}
+
+// Preset types
+export interface Preset {
+  id: string
+  name: string
+  description?: string
+  config: TranscodeConfig
+  isBuiltin: boolean
+  createdAt: string
+}
+
+// Progress update via WebSocket
+export interface ProgressUpdate {
+  taskId: string
+  status: TaskStatus
+  progress: number
+  speed: number
+  eta: number
+  error?: string
+}
+
+// Hardware info
+export interface HardwareInfo {
+  cpu: boolean
+  nvidia: boolean
+  intel: boolean
+  amd: boolean
+  gpuName?: string
+}
+

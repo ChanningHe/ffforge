@@ -1,0 +1,42 @@
+# Frontend
+frontend/node_modules
+frontend/dist
+frontend/.env.local
+frontend/.env.production.local
+
+# Backend
+backend/server
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# Database
+database/*.db
+database/*.db-shm
+database/*.db-wal
+
+# Config
+config/*.json
+!config/presets.example.json
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Dev
+devfile/*
