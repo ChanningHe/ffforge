@@ -41,45 +41,40 @@ RUN CGO_ENABLED=1 \
     ./cmd/server
 
 # Stage 3: Runtime image
-# Use standard Ubuntu for ARM/general compatibility
-# For NVIDIA GPU support, use: nvidia/cuda:12.2.0-runtime-ubuntu22.04
-FROM ubuntu:25.10
+FROM debian:13-slim@sha256:e711a7b30ec1261130d0a121050b4ed81d7fb28aeabcf4ea0c7876d4e9f5aca2
 
 # Use build arguments to detect architecture
 ARG TARGETARCH
+ARG OS_VERSION=trixie
+ARG PACKAGE_ARCH=${TARGETARCH}
 
-# Install runtime dependencies
-RUN apt-get update && apt-get install -y \
+# Set NVIDIA Transcoder environment variables
+ENV NVIDIA_VISIBLE_DEVICES="all"
+ENV NVIDIA_DRIVER_CAPABILITIES="compute,video,utility"
+
+RUN apt-get update \
+ && apt-get install --no-install-recommends --no-install-suggests --yes \
     ca-certificates \
-    wget \
+    gnupg \
     xz-utils \
-    && rm -rf /var/lib/apt/lists/*
+    curl \
+    wget \
+ && curl -fsSL https://repo.jellyfin.org/jellyfin_team.gpg.key \
+  | gpg --dearmor -o /etc/apt/keyrings/jellyfin.gpg \
+ && cat <<EOF > /etc/apt/sources.list.d/jellyfin.sources
+Types: deb
+URIs: https://repo.jellyfin.org/debian
+Suites: ${OS_VERSION}
+Components: main
+Architectures: ${PACKAGE_ARCH}
+Signed-By: /etc/apt/keyrings/jellyfin.gpg
+EOF
 
-# Try to install Intel drivers if available (x86_64 only)
-RUN apt-get update && \
-    (apt-get install -y intel-media-va-driver-non-free libva-drm2 vainfo intel-opencl-icd || true) && \
-    rm -rf /var/lib/apt/lists/*
-
-# Download and install FFmpeg static build based on architecture
-# This build includes: libx265, libsvtav1, libaom-av1, and all major codecs
-RUN if [ "$TARGETARCH" = "arm64" ]; then \
-        FFMPEG_URL="https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linuxarm64-gpl.tar.xz"; \
-    else \
-        FFMPEG_URL="https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linux64-gpl.tar.xz"; \
-    fi && \
-    echo "Downloading FFmpeg for ${TARGETARCH} from ${FFMPEG_URL}" && \
-    wget -O /tmp/ffmpeg.tar.xz "${FFMPEG_URL}" && \
-    mkdir -p /tmp/ffmpeg && \
-    tar -xf /tmp/ffmpeg.tar.xz -C /tmp/ffmpeg --strip-components=1 && \
-    cp /tmp/ffmpeg/bin/ffmpeg /usr/local/bin/ && \
-    cp /tmp/ffmpeg/bin/ffprobe /usr/local/bin/ && \
-    chmod +x /usr/local/bin/ffmpeg /usr/local/bin/ffprobe && \
-    rm -rf /tmp/ffmpeg /tmp/ffmpeg.tar.xz && \
-    echo "FFmpeg installed. Verifying encoders..." && \
-    ffmpeg -version && \
-    echo "" && \
-    echo "Available AV1 encoders:" && \
-    ffmpeg -encoders 2>/dev/null | grep -i av1 || echo "No AV1 encoders found"
+# Install Jellyfin FFmpeg using modern GPG key management
+RUN apt-get update \
+ && apt-get install --no-install-recommends --no-install-suggests -y \
+        jellyfin-ffmpeg7 \
+ && rm -rf /tmp/* /var/lib/apt/lists/* /var/tmp/* /var/log/*
 
 # Create app directory
 WORKDIR /app
@@ -96,6 +91,9 @@ RUN mkdir -p /data /output /app/config /app/config/database
 # Expose port
 EXPOSE 8080
 
+# Add Jellyfin FFmpeg to PATH
+ENV PATH="/usr/share/jellyfin-ffmpeg:${PATH}"
+
 # Set environment variables
 ENV GIN_MODE=release \
     PORT=8080 \
@@ -105,8 +103,8 @@ ENV GIN_MODE=release \
     DATABASE_PATH=/app/config/database/ffforge.db \
     MAX_CONCURRENT_TASKS=2 \
     ENABLE_GPU=true \
-    FFMPEG_PATH=/usr/local/bin/ffmpeg \
-    FFPROBE_PATH=/usr/local/bin/ffprobe
+    FFMPEG_PATH=/usr/share/jellyfin-ffmpeg/ffmpeg \
+    FFPROBE_PATH=/usr/share/jellyfin-ffmpeg/ffprobe
 
 # Note: Users can override FFMPEG_PATH and FFPROBE_PATH via environment variables
 # or mount custom binaries to /usr/local/bin/ffmpeg and /usr/local/bin/ffprobe
@@ -114,3 +112,6 @@ ENV GIN_MODE=release \
 # Run the application
 CMD ["./server"]
 
+# LABEL org.opencontainers.image.source=https://github.com/channinghe/ffforge
+# LABEL org.opencontainers.image.description="FFForge"
+# LABEL org.opencontainers.image.licenses=GPL-3.0

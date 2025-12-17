@@ -21,6 +21,7 @@ type Pool struct {
 	db                *database.DB
 	ffmpegService     *service.FFmpegService
 	fileService       *service.FileService
+	permissionService *service.PermissionService
 	maxWorkers        int
 	taskQueue         chan string // Task IDs
 	cancelFuncs       map[string]context.CancelFunc
@@ -47,15 +48,16 @@ func NewPool(db *database.DB, ffmpegService *service.FFmpegService, fileService 
 	ctx, cancel := context.WithCancel(context.Background())
 
 	pool := &Pool{
-		db:            db,
-		ffmpegService: ffmpegService,
-		fileService:   fileService,
-		maxWorkers:    maxWorkers,
-		taskQueue:     make(chan string, 100),
-		cancelFuncs:   make(map[string]context.CancelFunc),
-		progressChan:  make(chan *ProgressUpdate, 100),
-		ctx:           ctx,
-		cancel:        cancel,
+		db:                db,
+		ffmpegService:     ffmpegService,
+		fileService:       fileService,
+		permissionService: service.NewPermissionService(),
+		maxWorkers:        maxWorkers,
+		taskQueue:         make(chan string, 100),
+		cancelFuncs:       make(map[string]context.CancelFunc),
+		progressChan:      make(chan *ProgressUpdate, 100),
+		ctx:               ctx,
+		cancel:            cancel,
 	}
 
 	// Start workers
@@ -125,6 +127,15 @@ func (p *Pool) processTask(taskID string) {
 	if err != nil {
 		p.failTask(task, err.Error())
 		return
+	}
+
+	// Get source file size
+	sourceFileInfo, err := os.Stat(sourceFile)
+	if err != nil {
+		log.Printf("Warning: Failed to get source file size: %v", err)
+	} else {
+		task.SourceFileSize = sourceFileInfo.Size()
+		p.db.UpdateTask(task)
 	}
 
 	// Probe source file to get duration
@@ -247,9 +258,20 @@ func (p *Pool) processTask(taskID string) {
 	task.Speed = 0
 	task.ETA = 0
 
+	// Get output file size
+	outputFileInfo, err := os.Stat(fullOutputFile)
+	if err != nil {
+		log.Printf("Warning: Failed to get output file size: %v", err)
+	} else {
+		task.OutputFileSize = outputFileInfo.Size()
+	}
+
 	if err := p.db.UpdateTask(task); err != nil {
 		log.Printf("Failed to update completed task: %v", err)
 	}
+
+	// Apply file permissions based on settings
+	p.applyFilePermissions(task, sourceFile, fullOutputFile)
 
 	p.progressChan <- &ProgressUpdate{
 		TaskID:   taskID,
@@ -362,6 +384,33 @@ func (p *Pool) loadPendingTasks() {
 	}
 
 	log.Printf("Loaded %d pending tasks", len(tasks))
+}
+
+// applyFilePermissions applies file permissions to the output file based on settings
+func (p *Pool) applyFilePermissions(task *model.Task, sourceFile, outputFile string) {
+	// Get settings from database
+	var settings model.Settings
+	err := p.db.Conn().QueryRow(`
+		SELECT file_permission_mode, file_permission_uid, file_permission_gid
+		FROM settings WHERE id = 1
+	`).Scan(&settings.FilePermissionMode, &settings.FilePermissionUID, &settings.FilePermissionGID)
+
+	if err != nil {
+		log.Printf("Warning: Failed to get settings for file permissions: %v", err)
+		return
+	}
+
+	// Apply permissions
+	applied, err := p.permissionService.ApplyFilePermissions(outputFile, sourceFile, &settings)
+	if err != nil {
+		log.Printf("Warning: Failed to apply file permissions for task %s: %v", task.ID, err)
+		// Don't fail the task, just log the warning
+		return
+	}
+
+	if applied {
+		log.Printf("File permissions applied successfully for task %s", task.ID)
+	}
 }
 
 // Shutdown gracefully shuts down the worker pool

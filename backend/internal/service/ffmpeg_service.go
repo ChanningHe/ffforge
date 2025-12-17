@@ -240,6 +240,11 @@ func (fs *FFmpegService) buildAudioArgs(audio *model.AudioConfig) []string {
 	} else {
 		args = append(args, "-c:a", audio.Codec)
 
+		// Add -strict -2 for opus encoder (experimental feature flag)
+		if audio.Codec == "opus" {
+			args = append(args, "-strict", "-2")
+		}
+
 		// Audio bitrate
 		if audio.Bitrate != "" {
 			args = append(args, "-b:a", audio.Bitrate)

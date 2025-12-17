@@ -132,9 +132,9 @@ func (h *TasksHandler) DeleteTask(c *gin.Context) {
 		return
 	}
 
-	// Can only delete completed, failed, or cancelled tasks
-	if task.Status == model.TaskStatusRunning {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "cannot delete running task"})
+	// Can only delete completed, failed, or cancelled tasks (not running or pending)
+	if task.Status == model.TaskStatusRunning || task.Status == model.TaskStatusPending {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "cannot delete running or pending task"})
 		return
 	}
 
@@ -169,16 +169,26 @@ func (h *TasksHandler) CancelTask(c *gin.Context) {
 		return
 	}
 
-	// Can only cancel running tasks
-	if task.Status != model.TaskStatusRunning {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "task is not running"})
+	// Can only cancel running or pending tasks
+	if task.Status != model.TaskStatusRunning && task.Status != model.TaskStatusPending {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "task is not running or pending"})
 		return
 	}
 
-	// Cancel task
-	if err := h.pool.CancelTask(id); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to cancel task"})
-		return
+	// Try to cancel task from worker pool (may fail if task was interrupted)
+	err = h.pool.CancelTask(id)
+	if err != nil {
+		// If cancel fails (e.g., task not in worker pool due to restart),
+		// manually mark it as cancelled in the database
+		now := time.Now()
+		task.Status = model.TaskStatusCancelled
+		task.Error = "Task cancelled (not running in worker pool)"
+		task.CompletedAt = &now
+		
+		if updateErr := h.db.UpdateTask(task); updateErr != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to cancel task"})
+			return
+		}
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "task cancelled"})

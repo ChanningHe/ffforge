@@ -27,14 +27,23 @@ services:
       - CORS_ORIGINS=http://localhost:3000
       # FFmpeg paths (default: /usr/local/bin/ffmpeg and /usr/local/bin/ffprobe)
       # Override these if you mount custom binaries elsewhere
-      - FFMPEG_PATH=/usr/local/bin/ffmpeg
-      - FFPROBE_PATH=/usr/local/bin/ffprobe
-    # Intel GPU
-    # Use command "getent group render | cut -d: -f3" to get the group id
-    # group_add:
-    #   - 'gid-from-command'
+      # - FFMPEG_PATH=/usr/local/bin/ffmpeg
+      # - FFPROBE_PATH=/usr/local/bin/ffprobe
+
+    # ============ intel gpu configuration ============
+    # if you want to use Intel GPU, uncomment the following:
     # devices:
     #   - /dev/dri/renderD128:/dev/dri/renderD128
+    
+    # ============ nvidia gpu configuration ============
+    # if you want to use NVIDIA GPU, uncomment the following:
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu, video, compute, utility]
 networks:
   ffweb-network:
     driver: bridge

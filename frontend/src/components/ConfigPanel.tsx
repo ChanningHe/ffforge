@@ -85,11 +85,11 @@ export default function ConfigPanel({ selectedFiles, onConfigChange, initialConf
     if (selectedPreset && presets) {
       const preset = presets.find(p => p.id === selectedPreset)
       if (preset) {
-        // Load preset config into form, preserving the current mode
-        setConfig(prevConfig => ({
+        // Load preset config into form, including its mode
+        setConfig({
           ...preset.config,
-          mode: prevConfig.mode || 'simple', // Preserve mode, default to simple
-        }))
+          mode: preset.config.mode || 'simple', // Use preset's mode, default to simple
+        })
       }
     }
   }, [selectedPreset, presets])
@@ -254,23 +254,19 @@ export default function ConfigPanel({ selectedFiles, onConfigChange, initialConf
       </CardHeader>
       <CardContent className="flex-1 overflow-y-auto overflow-x-hidden py-2.5 space-y-2">
 
-        {/* Preset Selection - Only in Simple Mode */}
-        {config.mode === 'simple' && (
-          <>
-            <div>
-              <label className="block text-[11px] font-medium mb-1 text-muted-foreground">
-                {t.config.preset}
-              </label>
-              <Select
-                value={selectedPreset}
-                onChange={setSelectedPreset}
-                options={presetOptions}
-              />
-            </div>
+        {/* Preset Selection - Available in both Simple and Advanced Mode */}
+        <div>
+          <label className="block text-[11px] font-medium mb-1 text-muted-foreground">
+            {t.config.preset}
+          </label>
+          <Select
+            value={selectedPreset}
+            onChange={setSelectedPreset}
+            options={presetOptions}
+          />
+        </div>
 
-            <div className="border-t pt-2" />
-          </>
-        )}
+        <div className="border-t pt-2" />
 
         {/* Simple Mode Configuration */}
         {config.mode === 'simple' && (

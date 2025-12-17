@@ -8,6 +8,8 @@ interface AppSettings {
   defaultOutputPath: string
   enableGPU: boolean
   maxConcurrentTasks: number
+  ffmpegPath?: string
+  ffprobePath?: string
 }
 
 interface AppContextType {

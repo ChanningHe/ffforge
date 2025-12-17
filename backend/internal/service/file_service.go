@@ -20,15 +20,35 @@ func NewFileService(dataPath string) *FileService {
 	}
 }
 
-// BrowseDirectory lists files and directories in the specified path
-func (fs *FileService) BrowseDirectory(relativePath string) ([]*model.FileInfo, error) {
-	// Sanitize path to prevent directory traversal
-	cleanPath := filepath.Clean(relativePath)
-	if strings.Contains(cleanPath, "..") {
-		return nil, fmt.Errorf("invalid path: directory traversal not allowed")
+// GetDefaultPath returns the absolute path of the data directory
+func (fs *FileService) GetDefaultPath() (string, error) {
+	absPath, err := filepath.Abs(fs.dataPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to get absolute path: %w", err)
 	}
+	return absPath, nil
+}
 
-	fullPath := filepath.Join(fs.dataPath, cleanPath)
+// BrowseDirectory lists files and directories in the specified path
+func (fs *FileService) BrowseDirectory(pathParam string) ([]*model.FileInfo, error) {
+	var fullPath string
+
+	// If empty path, use data path as default
+	if pathParam == "" {
+		fullPath = fs.dataPath
+	} else {
+		// Check if it's an absolute path
+		if filepath.IsAbs(pathParam) {
+			fullPath = pathParam
+		} else {
+			// Treat as relative path from data path
+			cleanPath := filepath.Clean(pathParam)
+			if strings.Contains(cleanPath, "..") {
+				return nil, fmt.Errorf("invalid path: directory traversal not allowed")
+			}
+			fullPath = filepath.Join(fs.dataPath, cleanPath)
+		}
+	}
 
 	// Check if path exists and is within data path
 	absFullPath, err := filepath.Abs(fullPath)
@@ -41,7 +61,10 @@ func (fs *FileService) BrowseDirectory(relativePath string) ([]*model.FileInfo, 
 		return nil, fmt.Errorf("invalid data path: %w", err)
 	}
 
-	if !strings.HasPrefix(absFullPath, absDataPath) {
+	// Use filepath.Rel to ensure the path is within data directory
+	// This prevents attacks like /data-secret when dataPath is /data
+	relPath, err := filepath.Rel(absDataPath, absFullPath)
+	if err != nil || strings.HasPrefix(relPath, "..") {
 		return nil, fmt.Errorf("access denied: path outside data directory")
 	}
 
@@ -63,9 +86,16 @@ func (fs *FileService) BrowseDirectory(relativePath string) ([]*model.FileInfo, 
 			continue
 		}
 
+		// Build full absolute path for display
+		fullItemPath := filepath.Join(fullPath, entry.Name())
+		absItemPath, err := filepath.Abs(fullItemPath)
+		if err != nil {
+			absItemPath = fullItemPath
+		}
+
 		fileInfo := &model.FileInfo{
 			Name:    entry.Name(),
-			Path:    filepath.Join(relativePath, entry.Name()),
+			Path:    absItemPath, // Return full absolute path instead of relative
 			IsDir:   entry.IsDir(),
 			Size:    info.Size(),
 			ModTime: info.ModTime(),
@@ -82,14 +112,21 @@ func (fs *FileService) BrowseDirectory(relativePath string) ([]*model.FileInfo, 
 	return files, nil
 }
 
-// GetFullPath returns the full system path for a relative path
-func (fs *FileService) GetFullPath(relativePath string) (string, error) {
-	cleanPath := filepath.Clean(relativePath)
+// GetFullPath returns the full system path for a relative or absolute path
+func (fs *FileService) GetFullPath(pathParam string) (string, error) {
+	cleanPath := filepath.Clean(pathParam)
 	if strings.Contains(cleanPath, "..") {
 		return "", fmt.Errorf("invalid path: directory traversal not allowed")
 	}
 
-	fullPath := filepath.Join(fs.dataPath, cleanPath)
+	var fullPath string
+	// Check if it's already an absolute path
+	if filepath.IsAbs(cleanPath) {
+		fullPath = cleanPath
+	} else {
+		// Relative path, join with data path
+		fullPath = filepath.Join(fs.dataPath, cleanPath)
+	}
 
 	absFullPath, err := filepath.Abs(fullPath)
 	if err != nil {
@@ -101,7 +138,10 @@ func (fs *FileService) GetFullPath(relativePath string) (string, error) {
 		return "", fmt.Errorf("invalid data path: %w", err)
 	}
 
-	if !strings.HasPrefix(absFullPath, absDataPath) {
+	// Use filepath.Rel to ensure the path is within data directory
+	// This prevents attacks like /data-secret when dataPath is /data
+	relPath, err := filepath.Rel(absDataPath, absFullPath)
+	if err != nil || strings.HasPrefix(relPath, "..") {
 		return "", fmt.Errorf("access denied: path outside data directory")
 	}
 
@@ -154,4 +194,3 @@ func isVideoFile(filename string) bool {
 
 	return false
 }
-

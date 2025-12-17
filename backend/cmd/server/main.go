@@ -3,12 +3,14 @@ package main
 import (
 	"ffmpeg-web/internal/api"
 	"ffmpeg-web/internal/database"
+	"ffmpeg-web/internal/model"
 	"ffmpeg-web/internal/service"
 	"ffmpeg-web/internal/worker"
 	"fmt"
 	"log"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -28,6 +30,11 @@ func main() {
 	// Initialize builtin presets
 	if err := db.InitializeBuiltinPresets(); err != nil {
 		log.Printf("Warning: Failed to initialize builtin presets: %v", err)
+	}
+
+	// Clean up interrupted tasks on startup
+	if err := cleanupInterruptedTasks(db); err != nil {
+		log.Printf("Warning: Failed to cleanup interrupted tasks: %v", err)
 	}
 
 	// Initialize services
@@ -69,6 +76,7 @@ func main() {
 		// Files
 		apiGroup.GET("/files/browse", filesHandler.BrowseDirectory)
 		apiGroup.GET("/files/info", filesHandler.GetFileInfo)
+		apiGroup.GET("/files/default-path", filesHandler.GetDefaultPath)
 
 		// Tasks
 		apiGroup.POST("/tasks", tasksHandler.CreateTask)
@@ -189,4 +197,41 @@ func ensureDir(path string) {
 	if err := os.MkdirAll(path, 0755); err != nil {
 		log.Printf("Warning: Failed to create directory %s: %v", path, err)
 	}
+}
+
+// cleanupInterruptedTasks marks running or pending tasks as cancelled on app restart
+func cleanupInterruptedTasks(db *database.DB) error {
+	tasks, err := db.GetAllTasks()
+	if err != nil {
+		return err
+	}
+
+	now := time.Now()
+	count := 0
+
+	for _, task := range tasks {
+		// Mark running or pending tasks as cancelled (interrupted by restart)
+		if task.Status == model.TaskStatusRunning || task.Status == model.TaskStatusPending {
+			// Capture original status before modifying
+			originalStatus := task.Status
+
+			task.Status = model.TaskStatusCancelled
+			task.Error = "Task interrupted by application restart"
+			task.CompletedAt = &now
+
+			if err := db.UpdateTask(task); err != nil {
+				log.Printf("Failed to cleanup task %s: %v", task.ID, err)
+				continue
+			}
+
+			count++
+			log.Printf("Cleaned up interrupted task: %s (was %s)", task.ID, originalStatus)
+		}
+	}
+
+	if count > 0 {
+		log.Printf("Cleaned up %d interrupted task(s)", count)
+	}
+
+	return nil
 }

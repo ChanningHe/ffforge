@@ -34,6 +34,17 @@ func (h *FilesHandler) BrowseDirectory(c *gin.Context) {
 	c.JSON(http.StatusOK, files)
 }
 
+// GetDefaultPath handles GET /api/files/default-path
+func (h *FilesHandler) GetDefaultPath(c *gin.Context) {
+	defaultPath, err := h.fileService.GetDefaultPath()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"defaultPath": defaultPath})
+}
+
 // GetFileInfo handles GET /api/files/info
 func (h *FilesHandler) GetFileInfo(c *gin.Context) {
 	path := c.Query("path")

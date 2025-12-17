@@ -46,11 +46,11 @@ export function Select({ value, onChange, options, placeholder, className }: Sel
           'focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2'
         )}
       >
-        <span className={cn(!selectedOption && 'text-muted-foreground')}>
+        <span className={cn('flex-1 text-left', !selectedOption && 'text-muted-foreground')}>
           {selectedOption?.label || placeholder || 'Select...'}
         </span>
         <ChevronDown className={cn(
-          'w-4 h-4 transition-transform',
+          'w-4 h-4 transition-transform flex-shrink-0',
           isOpen && 'transform rotate-180'
         )} />
       </button>
@@ -66,12 +66,12 @@ export function Select({ value, onChange, options, placeholder, className }: Sel
                 setIsOpen(false)
               }}
               className={cn(
-                'w-full flex items-center gap-2 px-2 py-2.5 text-xs',
+                'w-full flex items-center gap-2 px-2 py-2.5 text-xs text-left',
                 'hover:bg-accent transition-colors',
                 value === option.value && 'bg-accent'
               )}
             >
-              <span className="truncate flex-1">{option.label}</span>
+              <span className="truncate flex-1 text-left">{option.label}</span>
               {option.tags && (
                 <div className="flex items-center gap-1 flex-shrink-0 ml-auto">
                   {option.tags}

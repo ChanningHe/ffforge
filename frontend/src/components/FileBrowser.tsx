@@ -1,7 +1,7 @@
 // File browser component with video info modal
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery, useMutation } from '@tanstack/react-query'
-import { Folder, File, ChevronRight, ChevronDown, ArrowUp, CheckSquare, Square, Play, Info } from 'lucide-react'
+import { Folder, File, ChevronRight, ChevronDown, ArrowUp, CheckSquare, Square, Play, Info, Home } from 'lucide-react'
 import { api } from '@/lib/api'
 import { useApp } from '@/contexts/AppContext'
 import { Card, CardContent } from '@/components/ui/card'
@@ -23,6 +23,20 @@ export default function FileBrowser({ onFilesSelected, selectedFiles, onStartTra
   const setCurrentPath = setFileBrowserPath
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set(['']))
   const [videoInfoDialogOpen, setVideoInfoDialogOpen] = useState(false)
+  const [defaultPath, setDefaultPath] = useState<string>('')
+
+  // Fetch default path on mount
+  useEffect(() => {
+    api.getDefaultPath().then(path => {
+      setDefaultPath(path)
+      // If no current path, set to default
+      if (!currentPath) {
+        setCurrentPath(path)
+      }
+    }).catch(err => {
+      console.error('Failed to get default path:', err)
+    })
+  }, [])
 
   const { data: files, isLoading } = useQuery({
     queryKey: ['files', currentPath],
@@ -81,9 +95,19 @@ export default function FileBrowser({ onFilesSelected, selectedFiles, onStartTra
   }
 
   const navigateUp = () => {
+    if (!currentPath) return
+    // For absolute paths
     const parts = currentPath.split('/').filter(Boolean)
-    parts.pop()
-    setCurrentPath(parts.join('/'))
+    if (parts.length > 0) {
+      parts.pop()
+      setCurrentPath('/' + parts.join('/'))
+    }
+  }
+
+  const goToDefaultPath = () => {
+    if (defaultPath) {
+      setCurrentPath(defaultPath)
+    }
   }
 
   const handleShowVideoInfo = (path: string) => {
@@ -109,17 +133,23 @@ export default function FileBrowser({ onFilesSelected, selectedFiles, onStartTra
         <div className="border-b p-3">
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2 flex-1 min-w-0">
-              {currentPath && (
-                <Button variant="ghost" size="sm" onClick={navigateUp} className="h-8">
+              {currentPath && currentPath !== '/' && (
+                <Button variant="ghost" size="sm" onClick={navigateUp} className="h-8 flex-shrink-0">
                   <ArrowUp className="h-4 w-4 mr-1" />
                   {t.transcode.goUp}
+                </Button>
+              )}
+              {defaultPath && currentPath !== defaultPath && (
+                <Button variant="ghost" size="sm" onClick={goToDefaultPath} className="h-8 flex-shrink-0">
+                  <Home className="h-4 w-4 mr-1" />
+                  {t.transcode.goToDefault}
                 </Button>
               )}
               <Button 
                 variant="ghost" 
                 size="sm" 
                 onClick={selectAllInFolder}
-                className="h-8"
+                className="h-8 flex-shrink-0"
               >
                 {allInFolderSelected ? (
                   <CheckSquare className="h-4 w-4 mr-1" />
@@ -129,7 +159,7 @@ export default function FileBrowser({ onFilesSelected, selectedFiles, onStartTra
                 {t.transcode.selectAll}
               </Button>
               <div className="h-4 w-px bg-border mx-1" />
-              <Badge variant="secondary" className="text-xs">
+              <Badge variant="secondary" className="text-xs flex-shrink-0">
                 {t.transcode.filesSelected.replace('{count}', selectedFiles.length.toString())}
               </Badge>
             </div>
@@ -138,7 +168,7 @@ export default function FileBrowser({ onFilesSelected, selectedFiles, onStartTra
               onClick={onStartTranscode}
               disabled={selectedFiles.length === 0}
               size="sm"
-              className="h-8"
+              className="h-8 flex-shrink-0"
             >
               <Play className="h-4 w-4 mr-1" />
               {t.transcode.startTranscode}
@@ -147,9 +177,9 @@ export default function FileBrowser({ onFilesSelected, selectedFiles, onStartTra
           
           {/* Current path display */}
           <div className="flex items-center gap-1 text-xs text-muted-foreground px-2">
-            <Folder className="h-3 w-3" />
+            <Folder className="h-3 w-3 flex-shrink-0" />
             <span className="truncate">
-              {currentPath ? `/${currentPath}` : '/'}
+              {currentPath || '/'}
             </span>
           </div>
         </div>

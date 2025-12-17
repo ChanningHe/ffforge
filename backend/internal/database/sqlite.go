@@ -53,6 +53,8 @@ func (db *DB) initialize() error {
 		speed REAL DEFAULT 0,
 		eta INTEGER DEFAULT 0,
 		error TEXT,
+		source_file_size INTEGER DEFAULT 0,
+		output_file_size INTEGER DEFAULT 0,
 		created_at DATETIME NOT NULL,
 		started_at DATETIME,
 		completed_at DATETIME,
@@ -74,6 +76,11 @@ func (db *DB) initialize() error {
 		default_output_path TEXT NOT NULL DEFAULT '/output',
 		enable_gpu INTEGER DEFAULT 1,
 		max_concurrent_tasks INTEGER DEFAULT 3,
+		ffmpeg_path TEXT NOT NULL DEFAULT 'ffmpeg',
+		ffprobe_path TEXT NOT NULL DEFAULT 'ffprobe',
+		file_permission_mode TEXT NOT NULL DEFAULT 'same_as_source',
+		file_permission_uid INTEGER DEFAULT 0,
+		file_permission_gid INTEGER DEFAULT 0,
 		created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 		updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 	);
@@ -83,7 +90,144 @@ func (db *DB) initialize() error {
 	`
 
 	_, err := db.conn.Exec(schema)
-	return err
+	if err != nil {
+		return err
+	}
+
+	// Run migrations for existing databases
+	return db.migrate()
+}
+
+// migrate handles database migrations for schema changes
+func (db *DB) migrate() error {
+	// Check which columns exist in settings table
+	rows, err := db.conn.Query("PRAGMA table_info(settings)")
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	hasFFmpegPath := false
+	hasFFprobePath := false
+	hasFilePermissionMode := false
+	hasFilePermissionUID := false
+	hasFilePermissionGID := false
+
+	for rows.Next() {
+		var cid int
+		var name string
+		var dataType string
+		var notNull int
+		var defaultValue sql.NullString
+		var pk int
+
+		if err := rows.Scan(&cid, &name, &dataType, &notNull, &defaultValue, &pk); err != nil {
+			return err
+		}
+
+		switch name {
+		case "ffmpeg_path":
+			hasFFmpegPath = true
+		case "ffprobe_path":
+			hasFFprobePath = true
+		case "file_permission_mode":
+			hasFilePermissionMode = true
+		case "file_permission_uid":
+			hasFilePermissionUID = true
+		case "file_permission_gid":
+			hasFilePermissionGID = true
+		}
+	}
+
+	rows.Close() // Close before next query
+
+	// Add ffmpeg_path column if it doesn't exist
+	if !hasFFmpegPath {
+		_, err = db.conn.Exec(`ALTER TABLE settings ADD COLUMN ffmpeg_path TEXT NOT NULL DEFAULT 'ffmpeg'`)
+		if err != nil {
+			return fmt.Errorf("failed to add ffmpeg_path column: %w", err)
+		}
+	}
+
+	// Add ffprobe_path column if it doesn't exist
+	if !hasFFprobePath {
+		_, err = db.conn.Exec(`ALTER TABLE settings ADD COLUMN ffprobe_path TEXT NOT NULL DEFAULT 'ffprobe'`)
+		if err != nil {
+			return fmt.Errorf("failed to add ffprobe_path column: %w", err)
+		}
+	}
+
+	// Add file_permission_mode column if it doesn't exist
+	if !hasFilePermissionMode {
+		_, err = db.conn.Exec(`ALTER TABLE settings ADD COLUMN file_permission_mode TEXT NOT NULL DEFAULT 'same_as_source'`)
+		if err != nil {
+			return fmt.Errorf("failed to add file_permission_mode column: %w", err)
+		}
+	}
+
+	// Add file_permission_uid column if it doesn't exist
+	if !hasFilePermissionUID {
+		_, err = db.conn.Exec(`ALTER TABLE settings ADD COLUMN file_permission_uid INTEGER DEFAULT 0`)
+		if err != nil {
+			return fmt.Errorf("failed to add file_permission_uid column: %w", err)
+		}
+	}
+
+	// Add file_permission_gid column if it doesn't exist
+	if !hasFilePermissionGID {
+		_, err = db.conn.Exec(`ALTER TABLE settings ADD COLUMN file_permission_gid INTEGER DEFAULT 0`)
+		if err != nil {
+			return fmt.Errorf("failed to add file_permission_gid column: %w", err)
+		}
+	}
+
+	// Check which columns exist in tasks table
+	taskRows, err := db.conn.Query("PRAGMA table_info(tasks)")
+	if err != nil {
+		return err
+	}
+	defer taskRows.Close()
+
+	hasSourceFileSize := false
+	hasOutputFileSize := false
+
+	for taskRows.Next() {
+		var cid int
+		var name string
+		var dataType string
+		var notNull int
+		var defaultValue sql.NullString
+		var pk int
+
+		if err := taskRows.Scan(&cid, &name, &dataType, &notNull, &defaultValue, &pk); err != nil {
+			return err
+		}
+
+		switch name {
+		case "source_file_size":
+			hasSourceFileSize = true
+		case "output_file_size":
+			hasOutputFileSize = true
+		}
+	}
+
+	// Add source_file_size column if it doesn't exist
+	if !hasSourceFileSize {
+		_, err = db.conn.Exec(`ALTER TABLE tasks ADD COLUMN source_file_size INTEGER DEFAULT 0`)
+		if err != nil {
+			return fmt.Errorf("failed to add source_file_size column: %w", err)
+		}
+	}
+
+	// Add output_file_size column if it doesn't exist
+	if !hasOutputFileSize {
+		_, err = db.conn.Exec(`ALTER TABLE tasks ADD COLUMN output_file_size INTEGER DEFAULT 0`)
+		if err != nil {
+			return fmt.Errorf("failed to add output_file_size column: %w", err)
+		}
+	}
+
+	return nil
 }
 
 // Task operations
@@ -97,13 +241,14 @@ func (db *DB) CreateTask(task *model.Task) error {
 
 	query := `
 		INSERT INTO tasks (id, source_file, output_file, status, progress, speed, eta, 
-			error, created_at, started_at, completed_at, preset, config)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			error, source_file_size, output_file_size, created_at, started_at, completed_at, preset, config)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 
 	_, err = db.conn.Exec(query,
 		task.ID, task.SourceFile, task.OutputFile, task.Status,
 		task.Progress, task.Speed, task.ETA, task.Error,
+		task.SourceFileSize, task.OutputFileSize,
 		task.CreatedAt, task.StartedAt, task.CompletedAt,
 		task.Preset, string(configJSON),
 	)
@@ -115,7 +260,7 @@ func (db *DB) CreateTask(task *model.Task) error {
 func (db *DB) GetTask(id string) (*model.Task, error) {
 	query := `
 		SELECT id, source_file, output_file, status, progress, speed, eta,
-			error, created_at, started_at, completed_at, preset, config
+			error, source_file_size, output_file_size, created_at, started_at, completed_at, preset, config
 		FROM tasks WHERE id = ?
 	`
 
@@ -126,6 +271,7 @@ func (db *DB) GetTask(id string) (*model.Task, error) {
 	err := db.conn.QueryRow(query, id).Scan(
 		&task.ID, &task.SourceFile, &task.OutputFile, &task.Status,
 		&task.Progress, &task.Speed, &task.ETA, &task.Error,
+		&task.SourceFileSize, &task.OutputFileSize,
 		&task.CreatedAt, &startedAt, &completedAt,
 		&task.Preset, &configJSON,
 	)
@@ -155,7 +301,7 @@ func (db *DB) GetTask(id string) (*model.Task, error) {
 func (db *DB) GetAllTasks() ([]*model.Task, error) {
 	query := `
 		SELECT id, source_file, output_file, status, progress, speed, eta,
-			error, created_at, started_at, completed_at, preset, config
+			error, source_file_size, output_file_size, created_at, started_at, completed_at, preset, config
 		FROM tasks ORDER BY created_at DESC
 	`
 
@@ -174,6 +320,7 @@ func (db *DB) GetAllTasks() ([]*model.Task, error) {
 		err := rows.Scan(
 			&task.ID, &task.SourceFile, &task.OutputFile, &task.Status,
 			&task.Progress, &task.Speed, &task.ETA, &task.Error,
+			&task.SourceFileSize, &task.OutputFileSize,
 			&task.CreatedAt, &startedAt, &completedAt,
 			&task.Preset, &configJSON,
 		)
@@ -208,14 +355,15 @@ func (db *DB) UpdateTask(task *model.Task) error {
 	query := `
 		UPDATE tasks SET
 			source_file = ?, output_file = ?, status = ?, progress = ?,
-			speed = ?, eta = ?, error = ?, started_at = ?, completed_at = ?,
-			preset = ?, config = ?
+			speed = ?, eta = ?, error = ?, source_file_size = ?, output_file_size = ?,
+			started_at = ?, completed_at = ?, preset = ?, config = ?
 		WHERE id = ?
 	`
 
 	_, err = db.conn.Exec(query,
 		task.SourceFile, task.OutputFile, task.Status, task.Progress,
-		task.Speed, task.ETA, task.Error, task.StartedAt, task.CompletedAt,
+		task.Speed, task.ETA, task.Error, task.SourceFileSize, task.OutputFileSize,
+		task.StartedAt, task.CompletedAt,
 		task.Preset, string(configJSON), task.ID,
 	)
 
@@ -474,9 +622,9 @@ func (db *DB) InitializeBuiltinPresets() error {
 					FPS:        "original",
 				},
 				Audio: model.AudioConfig{
-					Codec:    "opus",
-					Bitrate:  "192k",
-					Channels: 2,
+					Codec:    "copy",
+					Bitrate:  "",
+					Channels: 0,
 				},
 				Output: model.OutputConfig{
 					Container: "mkv",
@@ -502,9 +650,9 @@ func (db *DB) InitializeBuiltinPresets() error {
 					FPS:        "original",
 				},
 				Audio: model.AudioConfig{
-					Codec:    "opus",
-					Bitrate:  "128k",
-					Channels: 2,
+					Codec:    "copy",
+					Bitrate:  "",
+					Channels: 0,
 				},
 				Output: model.OutputConfig{
 					Container: "mkv",
@@ -530,9 +678,9 @@ func (db *DB) InitializeBuiltinPresets() error {
 					FPS:        "original",
 				},
 				Audio: model.AudioConfig{
-					Codec:    "opus",
-					Bitrate:  "96k",
-					Channels: 2,
+					Codec:    "copy",
+					Bitrate:  "",
+					Channels: 0,
 				},
 				Output: model.OutputConfig{
 					Container: "mkv",

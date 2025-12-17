@@ -31,6 +31,8 @@ export interface Task {
   speed: number
   eta: number
   error?: string
+  sourceFileSize?: number // in bytes
+  outputFileSize?: number // in bytes
   createdAt: string
   startedAt?: string
   completedAt?: string
@@ -101,5 +103,22 @@ export interface HardwareInfo {
   intel: boolean
   amd: boolean
   gpuName?: string
+}
+
+// Settings types
+export type FilePermissionMode = 'same_as_source' | 'specify' | 'no_action'
+
+export interface Settings {
+  id: number
+  defaultOutputPath: string
+  enableGPU: boolean
+  maxConcurrentTasks: number
+  ffmpegPath: string
+  ffprobePath: string
+  filePermissionMode: FilePermissionMode
+  filePermissionUid?: number
+  filePermissionGid?: number
+  createdAt: string
+  updatedAt: string
 }
 

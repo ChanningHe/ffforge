@@ -4,107 +4,11 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import { useApp } from '@/contexts/AppContext'
 import { useToast } from '@/components/ui/toast'
+import { generateFFmpegCommand } from '@/lib/utils'
 import FileBrowser from '@/components/FileBrowser'
 import ConfigPanel from '@/components/ConfigPanel'
 import { Terminal } from 'lucide-react'
 import type { TranscodeConfig } from '@/types'
-
-// Generate FFmpeg command preview based on config
-function generateFFmpegCommand(config: TranscodeConfig, inputFile: string = 'input.mp4'): string {
-  const parts: string[] = ['ffmpeg']
-  
-  // Check if using advanced mode
-  if (config.mode === 'advanced' && config.customCommand) {
-    // Advanced mode: use custom command with [[INPUT]] and [[OUTPUT]] placeholders
-    let customCmd = config.customCommand.trim()
-    const { output } = config
-    const outputFile = inputFile.replace(/\.[^/.]+$/, '') + output.suffix + '.' + output.container
-    
-    // Replace placeholders for preview
-    customCmd = customCmd.replace(/\[\[INPUT\]\]/g, inputFile)
-    customCmd = customCmd.replace(/\[\[OUTPUT\]\]/g, outputFile)
-    
-    parts.push(customCmd)
-    return parts.join(' ')
-  } else {
-    // Simple mode: build command from UI config
-    const { encoder, hardwareAccel, video, audio } = config
-    
-    // IMPORTANT: Hardware acceleration flags must come BEFORE -i input file
-    if (hardwareAccel === 'nvidia') {
-      parts.push('-hwaccel', 'cuda', '-hwaccel_output_format', 'cuda')
-    } else if (hardwareAccel === 'intel') {
-      parts.push('-hwaccel', 'qsv', '-hwaccel_output_format', 'qsv')
-    } else if (hardwareAccel === 'amd') {
-      // AMD AMF typically doesn't need input hardware acceleration
-    }
-    
-    // Add input file
-    parts.push('-i', inputFile)
-    
-    // Video codec
-    let videoCodec: string
-    if (hardwareAccel === 'nvidia') {
-      videoCodec = encoder === 'h265' ? 'hevc_nvenc' : 'av1_nvenc'
-    } else if (hardwareAccel === 'intel') {
-      videoCodec = encoder === 'h265' ? 'hevc_qsv' : 'av1_qsv'
-    } else if (hardwareAccel === 'amd') {
-      videoCodec = encoder === 'h265' ? 'hevc_amf' : 'av1_amf'
-    } else {
-      videoCodec = encoder === 'h265' ? 'libx265' : 'libsvtav1'
-    }
-    parts.push('-c:v', videoCodec)
-    
-    // Encoding preset
-    if (video.preset) {
-      if (hardwareAccel === 'amd') {
-        parts.push('-quality', video.preset)
-      } else {
-        parts.push('-preset', video.preset)
-      }
-    }
-    
-    // CRF/Quality
-    if (video.crf !== undefined) {
-      if (hardwareAccel === 'nvidia') {
-        parts.push('-cq', video.crf.toString())
-      } else if (hardwareAccel === 'intel') {
-        parts.push('-global_quality', video.crf.toString())
-      } else if (hardwareAccel === 'amd') {
-        parts.push('-qp_i', video.crf.toString())
-      } else {
-        parts.push('-crf', video.crf.toString())
-      }
-    }
-    
-    // Audio encoding
-    if (audio.codec === 'copy') {
-      parts.push('-c:a', 'copy')
-    } else {
-      parts.push('-c:a', audio.codec)
-      if (audio.bitrate) {
-        parts.push('-b:a', audio.bitrate)
-      }
-      if (audio.channels) {
-        parts.push('-ac', audio.channels.toString())
-      }
-    }
-    
-    // Extra parameters
-    if (config.extraParams && config.extraParams.trim()) {
-      parts.push(config.extraParams.trim())
-    }
-  }
-  
-  // Output file (only for simple mode, already handled in advanced mode)
-  if (config.mode !== 'advanced') {
-    const { output } = config
-    const outputFile = inputFile.replace(/\.[^/.]+$/, '') + output.suffix + '.' + output.container
-    parts.push(outputFile)
-  }
-  
-  return parts.join(' ')
-}
 
 export default function TranscodePage() {
   const [selectedFiles, setSelectedFiles] = useState<string[]>([])

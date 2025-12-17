@@ -28,3 +28,4 @@ func (h *HardwareHandler) GetHardwareInfo(c *gin.Context) {
 
 
 
+

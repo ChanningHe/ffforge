@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { useToast } from '@/components/ui/toast'
 import { useApp } from '@/contexts/AppContext'
-import { Sparkles, Plus, Edit, Trash2, Download, Upload, Save, X } from 'lucide-react'
+import { Sparkles, Plus, Trash2, Download, Upload, Save, X } from 'lucide-react'
 import type { Preset, TranscodeConfig } from '@/types'
 import ConfigPanel from '@/components/ConfigPanel'
 
@@ -50,6 +50,11 @@ export default function PresetsPage() {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
   const [presetToDelete, setPresetToDelete] = useState<Preset | null>(null)
   const [commandPreview, setCommandPreview] = useState<string>('')
+  
+  // Track original values to detect changes
+  const [originalName, setOriginalName] = useState('')
+  const [originalDescription, setOriginalDescription] = useState('')
+  const [originalConfig, setOriginalConfig] = useState<TranscodeConfig>(DEFAULT_CONFIG)
 
   // Fetch presets
   const { data: presets, isLoading } = useQuery({
@@ -73,6 +78,11 @@ export default function PresetsPage() {
       setPresetDescription(selectedPreset.description || '')
       setPresetConfig(selectedPreset.config)
       setConfigResetTrigger(prev => prev + 1) // Trigger config reset
+      
+      // Store original values for change detection
+      setOriginalName(selectedPreset.name)
+      setOriginalDescription(selectedPreset.description || '')
+      setOriginalConfig(selectedPreset.config)
     }
   }, [selectedPresetId]) // Only depend on selectedPresetId
 
@@ -183,9 +193,13 @@ export default function PresetsPage() {
   const updateMutation = useMutation({
     mutationFn: (data: { id: string; name: string; description: string; config: TranscodeConfig }) =>
       api.updatePreset(data.id, data.name, data.description, data.config),
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['presets'] })
       setEditMode('view')
+      // Update original values after successful save
+      setOriginalName(variables.name)
+      setOriginalDescription(variables.description)
+      setOriginalConfig(variables.config)
       showToast(t.presets.updateSuccess, 'success')
     },
     onError: () => {
@@ -220,15 +234,9 @@ export default function PresetsPage() {
     const newConfig = { ...DEFAULT_CONFIG }
     setPresetConfig(newConfig)
     setConfigResetTrigger(prev => prev + 1)
-  }
-
-  const handleEdit = () => {
-    if (!selectedPreset) return
-    if (selectedPreset.isBuiltin) {
-      showToast('Cannot edit built-in presets', 'warning')
-      return
-    }
-    setEditMode('edit')
+    setOriginalName('')
+    setOriginalDescription('')
+    setOriginalConfig(DEFAULT_CONFIG)
   }
 
   const handleSave = () => {
@@ -243,7 +251,7 @@ export default function PresetsPage() {
         description: presetDescription,
         config: presetConfig,
       })
-    } else if (editMode === 'edit' && selectedPresetId) {
+    } else if ((editMode === 'edit' || editMode === 'view') && selectedPresetId) {
       updateMutation.mutate({
         id: selectedPresetId,
         name: presetName,
@@ -256,9 +264,10 @@ export default function PresetsPage() {
   const handleCancel = () => {
     if (selectedPreset) {
       setEditMode('view')
-      setPresetName(selectedPreset.name)
-      setPresetDescription(selectedPreset.description || '')
-      setPresetConfig(selectedPreset.config)
+      // Restore original values
+      setPresetName(originalName)
+      setPresetDescription(originalDescription)
+      setPresetConfig(originalConfig)
       setConfigResetTrigger(prev => prev + 1)
     } else {
       setEditMode('view')
@@ -362,6 +371,13 @@ export default function PresetsPage() {
   }
 
   const isEditing = editMode === 'create' || editMode === 'edit'
+  
+  // Check if there are any unsaved changes
+  const hasChanges = editMode === 'view' && selectedPreset && !selectedPreset.isBuiltin && (
+    presetName !== originalName ||
+    presetDescription !== originalDescription ||
+    JSON.stringify(presetConfig) !== JSON.stringify(originalConfig)
+  )
 
   return (
     <div className="flex flex-1 flex-col">
@@ -506,18 +522,26 @@ export default function PresetsPage() {
             {/* Header */}
             <div className="p-4 border-b flex items-center justify-between">
               <div className="flex-1 min-w-0">
-                <h2 className="text-lg font-semibold truncate">
-                  {editMode === 'create' ? t.presets.createPreset : selectedPreset?.name}
-                </h2>
-                {selectedPreset?.description && editMode === 'view' && (
-                  <p className="text-sm text-muted-foreground mt-0.5">
-                    {selectedPreset.description}
-                  </p>
-                )}
+                {editMode === 'create' ? (
+                  <h2 className="text-lg font-semibold truncate">
+                    {t.presets.createPreset}
+                  </h2>
+                ) : selectedPreset?.isBuiltin ? (
+                  <>
+                    <h2 className="text-lg font-semibold truncate">
+                      {selectedPreset?.name}
+                    </h2>
+                    {selectedPreset?.description && (
+                      <p className="text-sm text-muted-foreground mt-0.5">
+                        {selectedPreset.description}
+                      </p>
+                    )}
+                  </>
+                ) : null}
               </div>
               
               <div className="flex gap-2 ml-4">
-                {isEditing ? (
+                {isEditing || hasChanges ? (
                   <>
                     <Button variant="outline" size="sm" onClick={handleCancel}>
                       <X className="h-4 w-4 mr-1" />
@@ -530,15 +554,6 @@ export default function PresetsPage() {
                   </>
                 ) : (
                   <>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleEdit}
-                      disabled={selectedPreset?.isBuiltin}
-                    >
-                      <Edit className="h-4 w-4 mr-1" />
-                      {t.common.edit}
-                    </Button>
                     <Button
                       variant="outline"
                       size="sm"
@@ -556,8 +571,8 @@ export default function PresetsPage() {
             {/* Content */}
             <div className="flex-1 overflow-auto p-4">
               <div className="max-w-4xl min-w-[800px] space-y-4">
-                {/* Name and Description (only in edit/create mode) */}
-                {isEditing && (
+                {/* Name and Description (always shown for non-builtin presets and in create mode) */}
+                {(editMode === 'create' || (selectedPreset && !selectedPreset.isBuiltin)) && (
                   <>
                     <div>
                       <label className="block text-sm font-medium mb-1.5">
@@ -599,7 +614,7 @@ export default function PresetsPage() {
 
                 {/* Configuration Panel */}
                 <div>
-                  {isEditing && (
+                  {(editMode === 'create' || (selectedPreset && !selectedPreset.isBuiltin)) && (
                     <label className="block text-sm font-medium mb-2">
                       {t.presets.presetConfig}
                     </label>

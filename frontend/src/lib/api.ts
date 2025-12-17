@@ -1,4 +1,4 @@
-import type { FileInfo, Task, Preset, HardwareInfo, TranscodeConfig } from '@/types'
+import type { FileInfo, Task, Preset, HardwareInfo, TranscodeConfig, Settings } from '@/types'
 
 const API_BASE = '/api'
 
@@ -15,6 +15,13 @@ class APIClient {
     const response = await fetch(`${API_BASE}/files/info?path=${encodeURIComponent(path)}`)
     if (!response.ok) throw new Error('Failed to get video info')
     return response.json()
+  }
+
+  async getDefaultPath(): Promise<string> {
+    const response = await fetch(`${API_BASE}/files/default-path`)
+    if (!response.ok) throw new Error('Failed to get default path')
+    const data = await response.json()
+    return data.defaultPath
   }
 
   // Tasks
@@ -98,6 +105,23 @@ class APIClient {
   async getHardwareInfo(): Promise<HardwareInfo> {
     const response = await fetch(`${API_BASE}/hardware`)
     if (!response.ok) throw new Error('Failed to get hardware info')
+    return response.json()
+  }
+
+  // Settings
+  async getSettings(): Promise<Settings> {
+    const response = await fetch(`${API_BASE}/settings`)
+    if (!response.ok) throw new Error('Failed to get settings')
+    return response.json()
+  }
+
+  async updateSettings(settings: Partial<Settings>): Promise<Settings> {
+    const response = await fetch(`${API_BASE}/settings`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(settings),
+    })
+    if (!response.ok) throw new Error('Failed to update settings')
     return response.json()
   }
 }

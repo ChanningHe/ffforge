@@ -1,5 +1,5 @@
 // Settings page for global configuration
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useApp } from '@/contexts/AppContext'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -8,28 +8,70 @@ import { Slider } from '@/components/ui/slider'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
-import { Sun, Moon, Monitor, Check, Languages, Palette, Settings2, FolderOpen, Zap, RotateCcw } from 'lucide-react'
+import { Select } from '@/components/ui/select'
+import { Sun, Moon, Monitor, Check, Languages, Palette, Settings2, FolderOpen, Zap, RotateCcw, Shield } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { Settings as SettingsType, FilePermissionMode } from '@/types'
+import { api } from '@/lib/api'
 
 export default function SettingsPage() {
-  const { t, language, setLanguage, theme, setTheme, settings, updateSettings } = useApp()
-  const [localSettings, setLocalSettings] = useState(settings)
+  const { t, language, setLanguage, theme, setTheme } = useApp()
+  const [localSettings, setLocalSettings] = useState<Partial<SettingsType>>({})
   const [saved, setSaved] = useState(false)
+  const [loading, setLoading] = useState(true)
 
-  const handleSave = () => {
-    updateSettings(localSettings)
-    setSaved(true)
-    setTimeout(() => setSaved(false), 2000)
+  // Load settings from API
+  useEffect(() => {
+    loadSettings()
+  }, [])
+
+  const loadSettings = async () => {
+    try {
+      setLoading(true)
+      const data = await api.getSettings()
+      setLocalSettings(data)
+    } catch (error) {
+      console.error('Failed to load settings:', error)
+    } finally {
+      setLoading(false)
+    }
   }
 
-  const handleReset = () => {
-    const defaults = {
+  const handleSave = async () => {
+    try {
+      await api.updateSettings(localSettings)
+      setSaved(true)
+      setTimeout(() => setSaved(false), 2000)
+    } catch (error) {
+      console.error('Failed to save settings:', error)
+    }
+  }
+
+  const handleReset = async () => {
+    const defaults: Partial<SettingsType> = {
       defaultOutputPath: '/output',
       enableGPU: true,
       maxConcurrentTasks: 3,
+      ffmpegPath: 'ffmpeg',
+      ffprobePath: 'ffprobe',
+      filePermissionMode: 'same_as_source',
+      filePermissionUid: 0,
+      filePermissionGid: 0,
     }
     setLocalSettings(defaults)
-    updateSettings(defaults)
+    try {
+      await api.updateSettings(defaults)
+    } catch (error) {
+      console.error('Failed to reset settings:', error)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex flex-1 items-center justify-center">
+        <div className="text-muted-foreground">{t.common.loading}</div>
+      </div>
+    )
   }
 
   return (
@@ -144,27 +186,148 @@ export default function SettingsPage() {
               </div>
             </CardHeader>
             <CardContent className="space-y-6">
-              {/* Default Output Path */}
-              <div className="space-y-3">
+              {/* Paths Section */}
+              <div className="space-y-4">
                 <div className="flex items-center gap-2">
                   <FolderOpen className="h-4 w-4 text-muted-foreground" />
-                  <Label htmlFor="output-path" className="text-sm font-medium">
+                  <Label className="text-sm font-medium">{t.settings.paths}</Label>
+                </div>
+                
+                {/* Default Output Path */}
+                <div className="space-y-2 pl-6">
+                  <Label htmlFor="output-path" className="text-xs">
                     {t.settings.defaultOutputPath}
                   </Label>
+                  <Input
+                    id="output-path"
+                    type="text"
+                    value={localSettings.defaultOutputPath || ''}
+                    onChange={(e) =>
+                      setLocalSettings({ ...localSettings, defaultOutputPath: e.target.value })
+                    }
+                    placeholder="/output"
+                    className="font-mono text-sm"
+                  />
                 </div>
-                <Input
-                  id="output-path"
-                  type="text"
-                  value={localSettings.defaultOutputPath}
-                  onChange={(e) =>
-                    setLocalSettings({ ...localSettings, defaultOutputPath: e.target.value })
-                  }
-                  placeholder="/output"
-                  className="font-mono text-sm"
-                />
-                <p className="text-xs text-muted-foreground">
-                  Default directory for transcoded video files
-                </p>
+
+                {/* FFmpeg Path */}
+                <div className="space-y-2 pl-6">
+                  <Label htmlFor="ffmpeg-path" className="text-xs">
+                    {t.settings.ffmpegPath}
+                  </Label>
+                  <Input
+                    id="ffmpeg-path"
+                    type="text"
+                    value={localSettings.ffmpegPath || ''}
+                    onChange={(e) =>
+                      setLocalSettings({ ...localSettings, ffmpegPath: e.target.value })
+                    }
+                    placeholder={t.settings.pathPlaceholder}
+                    className="font-mono text-sm"
+                  />
+                </div>
+
+                {/* FFprobe Path */}
+                <div className="space-y-2 pl-6">
+                  <Label htmlFor="ffprobe-path" className="text-xs">
+                    {t.settings.ffprobePath}
+                  </Label>
+                  <Input
+                    id="ffprobe-path"
+                    type="text"
+                    value={localSettings.ffprobePath || ''}
+                    onChange={(e) =>
+                      setLocalSettings({ ...localSettings, ffprobePath: e.target.value })
+                    }
+                    placeholder={t.settings.pathPlaceholder}
+                    className="font-mono text-sm"
+                  />
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* File Permissions Section */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <Shield className="h-4 w-4 text-muted-foreground" />
+                  <Label className="text-sm font-medium">{t.settings.filePermissions}</Label>
+                </div>
+                
+                {/* Permission Mode */}
+                <div className="space-y-2 pl-6">
+                  <Label htmlFor="permission-mode" className="text-xs">
+                    {t.settings.filePermissionMode}
+                  </Label>
+                  <Select
+                    value={localSettings.filePermissionMode || 'same_as_source'}
+                    onChange={(value: string) =>
+                      setLocalSettings({ ...localSettings, filePermissionMode: value as FilePermissionMode })
+                    }
+                    options={[
+                      {
+                        value: 'same_as_source',
+                        label: t.settings.filePermissionModes.sameAsSource,
+                      },
+                      {
+                        value: 'specify',
+                        label: t.settings.filePermissionModes.specify,
+                      },
+                      {
+                        value: 'no_action',
+                        label: t.settings.filePermissionModes.noAction,
+                      },
+                    ]}
+                    placeholder={t.settings.filePermissionMode}
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {localSettings.filePermissionMode === 'same_as_source' && t.settings.filePermissionModeDesc.sameAsSource}
+                    {localSettings.filePermissionMode === 'specify' && t.settings.filePermissionModeDesc.specify}
+                    {localSettings.filePermissionMode === 'no_action' && t.settings.filePermissionModeDesc.noAction}
+                  </p>
+                </div>
+
+                {/* UID/GID inputs - only show when mode is 'specify' */}
+                {localSettings.filePermissionMode === 'specify' && (
+                  <div className="space-y-3 pl-6">
+                    <div className="space-y-2">
+                      <Label htmlFor="permission-uid" className="text-xs">
+                        {t.settings.filePermissionUid}
+                      </Label>
+                      <Input
+                        id="permission-uid"
+                        type="number"
+                        min="0"
+                        value={localSettings.filePermissionUid ?? 0}
+                        onChange={(e) =>
+                          setLocalSettings({ 
+                            ...localSettings, 
+                            filePermissionUid: parseInt(e.target.value) || 0 
+                          })
+                        }
+                        className="font-mono text-sm"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="permission-gid" className="text-xs">
+                        {t.settings.filePermissionGid}
+                      </Label>
+                      <Input
+                        id="permission-gid"
+                        type="number"
+                        min="0"
+                        value={localSettings.filePermissionGid ?? 0}
+                        onChange={(e) =>
+                          setLocalSettings({ 
+                            ...localSettings, 
+                            filePermissionGid: parseInt(e.target.value) || 0 
+                          })
+                        }
+                        className="font-mono text-sm"
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
 
               <Separator />
@@ -192,7 +355,7 @@ export default function SettingsPage() {
                     {localSettings.enableGPU ? 'ON' : 'OFF'}
                   </div>
                   <Switch
-                    checked={localSettings.enableGPU}
+                    checked={localSettings.enableGPU || false}
                     onCheckedChange={(checked) =>
                       setLocalSettings({ ...localSettings, enableGPU: checked })
                     }
@@ -210,7 +373,7 @@ export default function SettingsPage() {
                   </Label>
                   <div className="flex items-center gap-2">
                     <span className="text-2xl font-bold text-primary">
-                      {localSettings.maxConcurrentTasks}
+                      {localSettings.maxConcurrentTasks || 3}
                     </span>
                     <span className="text-sm text-muted-foreground">tasks</span>
                   </div>
@@ -218,7 +381,7 @@ export default function SettingsPage() {
                 <Slider
                   min={1}
                   max={10}
-                  value={localSettings.maxConcurrentTasks}
+                  value={localSettings.maxConcurrentTasks || 3}
                   onChange={(val) =>
                     setLocalSettings({
                       ...localSettings,

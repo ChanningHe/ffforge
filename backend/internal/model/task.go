@@ -17,19 +17,21 @@ const (
 
 // Task represents a video transcode task
 type Task struct {
-	ID          string          `json:"id"`
-	SourceFile  string          `json:"sourceFile"`
-	OutputFile  string          `json:"outputFile"`
-	Status      TaskStatus      `json:"status"`
-	Progress    float64         `json:"progress"`
-	Speed       float64         `json:"speed"`
-	ETA         int64           `json:"eta"` // seconds
-	Error       string          `json:"error,omitempty"`
-	CreatedAt   time.Time       `json:"createdAt"`
-	StartedAt   *time.Time      `json:"startedAt,omitempty"`
-	CompletedAt *time.Time      `json:"completedAt,omitempty"`
-	Preset      string          `json:"preset,omitempty"`
-	Config      TranscodeConfig `json:"config"`
+	ID             string          `json:"id"`
+	SourceFile     string          `json:"sourceFile"`
+	OutputFile     string          `json:"outputFile"`
+	Status         TaskStatus      `json:"status"`
+	Progress       float64         `json:"progress"`
+	Speed          float64         `json:"speed"`
+	ETA            int64           `json:"eta"` // seconds
+	Error          string          `json:"error,omitempty"`
+	SourceFileSize int64           `json:"sourceFileSize,omitempty"` // in bytes
+	OutputFileSize int64           `json:"outputFileSize,omitempty"` // in bytes
+	CreatedAt      time.Time       `json:"createdAt"`
+	StartedAt      *time.Time      `json:"startedAt,omitempty"`
+	CompletedAt    *time.Time      `json:"completedAt,omitempty"`
+	Preset         string          `json:"preset,omitempty"`
+	Config         TranscodeConfig `json:"config"`
 }
 
 // TranscodeConfig represents the configuration for a transcode task
