@@ -37,13 +37,14 @@ services:
     
     # ============ nvidia gpu configuration ============
     # if you want to use NVIDIA GPU, uncomment the following:
+    # runtime: nvidia
     # deploy:
     #   resources:
     #     reservations:
     #       devices:
     #         - driver: nvidia
     #           count: all
-    #           capabilities: [gpu, video, compute, utility]
+    #           capabilities: [gpu]
 networks:
   ffweb-network:
     driver: bridge

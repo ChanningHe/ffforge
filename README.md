@@ -17,7 +17,7 @@ A modern web application for video transcoding with H.265/AV1 encoding support.
 
 ## Roadmap
 - [x] File permission management
-- [ ] NVIDIA GPU Transcoder confirm
+- [x] NVIDIA GPU Transcoder confirm
 - [ ] Intel QSV / NVIDIA Preset
 - [x] Homepage refact
 - [ ] Desktop application support
@@ -57,13 +57,14 @@ services:
     
     # ============ nvidia gpu configuration ============
     # if you want to use NVIDIA GPU, uncomment the following:
+    # runtime: nvidia
     # deploy:
     #   resources:
     #     reservations:
     #       devices:
     #         - driver: nvidia
     #           count: all
-    #           capabilities: [gpu, video, compute, utility]
+    #           capabilities: [gpu]
 networks:
   ffweb-network:
     driver: bridge
