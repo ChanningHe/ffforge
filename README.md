@@ -5,6 +5,7 @@ A modern web application for video transcoding with H.265/AV1 encoding support.
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 [![Docker](https://img.shields.io/badge/Docker-Ready-blue)](Dockerfile)
 
+![](./doc/PageHP.jpg)
 ## Features
 
 - Web-based file browser
@@ -18,7 +19,7 @@ A modern web application for video transcoding with H.265/AV1 encoding support.
 - [x] File permission management
 - [ ] NVIDIA GPU Transcoder confirm
 - [ ] Intel QSV / NVIDIA Preset
-- [ ] Homepage refactor
+- [x] Homepage refact
 - [ ] Desktop application support
 - [ ] Remote agent transcoding
 

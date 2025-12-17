@@ -1,4 +1,6 @@
 import type { FileInfo, Task, Preset, HardwareInfo, TranscodeConfig, Settings } from '@/types'
+import type { HostInfo, SystemUsage, SystemHistory } from '@/types/system'
+import type { GPUCapabilities } from '@/types/hardware'
 
 const API_BASE = '/api'
 
@@ -108,6 +110,31 @@ class APIClient {
     return response.json()
   }
 
+  async getGPUCapabilities(): Promise<GPUCapabilities> {
+    const response = await fetch(`${API_BASE}/hardware/capabilities`)
+    if (!response.ok) throw new Error('Failed to get GPU capabilities')
+    return response.json()
+  }
+
+  // System
+  async getSystemHostInfo(): Promise<HostInfo> {
+    const response = await fetch(`${API_BASE}/system/host`)
+    if (!response.ok) throw new Error('Failed to get system host info')
+    return response.json()
+  }
+
+  async getSystemUsage(): Promise<SystemUsage> {
+    const response = await fetch(`${API_BASE}/system/usage`)
+    if (!response.ok) throw new Error('Failed to get system usage')
+    return response.json()
+  }
+
+  async getSystemHistory(): Promise<SystemHistory> {
+    const response = await fetch(`${API_BASE}/system/history`)
+    if (!response.ok) throw new Error('Failed to get system history')
+    return response.json()
+  }
+
   // Settings
   async getSettings(): Promise<Settings> {
     const response = await fetch(`${API_BASE}/settings`)
@@ -127,4 +154,3 @@ class APIClient {
 }
 
 export const api = new APIClient()
-

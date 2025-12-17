@@ -41,6 +41,9 @@ func main() {
 	fileService := service.NewFileService(config.DataPath)
 	hardwareService := service.NewHardwareService()
 	ffmpegService := service.NewFFmpegService(config.FFmpegPath, config.FFprobePath, config.OutputPath)
+	systemService := service.NewSystemService()
+	systemService.StartMonitoring()
+	defer systemService.StopMonitoring()
 
 	// Initialize worker pool
 	workerPool := worker.NewPool(db, ffmpegService, fileService, config.MaxConcurrentTasks)
@@ -56,6 +59,7 @@ func main() {
 	presetsHandler := api.NewPresetsHandler(db)
 	hardwareHandler := api.NewHardwareHandler(hardwareService)
 	settingsHandler := api.NewSettingsHandler(db.Conn())
+	systemHandler := api.NewSystemHandler(systemService)
 
 	// Setup Gin router
 	if config.GinMode == "release" {
@@ -96,10 +100,16 @@ func main() {
 
 		// Hardware
 		apiGroup.GET("/hardware", hardwareHandler.GetHardwareInfo)
+		apiGroup.GET("/hardware/capabilities", hardwareHandler.GetGPUCapabilities)
 
 		// Settings
 		apiGroup.GET("/settings", settingsHandler.GetSettings)
 		apiGroup.PUT("/settings", settingsHandler.UpdateSettings)
+
+		// System
+		apiGroup.GET("/system/host", systemHandler.GetHostInfo)
+		apiGroup.GET("/system/usage", systemHandler.GetUsage)
+		apiGroup.GET("/system/history", systemHandler.GetHistory)
 
 		// WebSocket
 		apiGroup.GET("/ws/progress", wsHandler.HandleWebSocket)

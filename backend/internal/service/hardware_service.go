@@ -1,6 +1,7 @@
 package service
 
 import (
+	"bufio"
 	"ffmpeg-web/internal/model"
 	"os"
 	"os/exec"
@@ -99,7 +100,8 @@ func (hs *HardwareService) detectIntelQSV() bool {
 
 // detectAMD checks if AMD GPU acceleration is available
 func (hs *HardwareService) detectAMD() bool {
-	// Check if FFmpeg supports AMF
+	// First check if FFmpeg supports AMF encoders
+	// This works on all platforms (Windows, Linux with ROCm)
 	cmd := exec.Command("ffmpeg", "-hide_banner", "-encoders")
 	output, err := cmd.Output()
 	if err != nil {
@@ -107,10 +109,150 @@ func (hs *HardwareService) detectAMD() bool {
 	}
 
 	outputStr := string(output)
-	return strings.Contains(outputStr, "hevc_amf") || strings.Contains(outputStr, "h264_amf")
+	hasAMFEncoder := strings.Contains(outputStr, "hevc_amf") || strings.Contains(outputStr, "h264_amf")
+
+	if !hasAMFEncoder {
+		return false
+	}
+
+	// On Linux, we need to differentiate AMD from Intel using vainfo
+	// Both use /dev/dri devices, but vainfo output differs
+	if _, err := os.Stat("/dev/dri"); err == nil {
+		// Linux system with DRI
+		// Use vainfo to check if it's AMD GPU
+		if isAMDGPU := hs.isAMDGPUViaVAInfo(); isAMDGPU {
+			return true
+		}
+		// If vainfo doesn't detect AMD, but AMF encoder exists,
+		// might be using proprietary driver or ROCm
+		return hasAMFEncoder
+	}
+
+	// On Windows/macOS, if AMF encoder exists, it's AMD
+	return hasAMFEncoder
 }
 
+// isAMDGPUViaVAInfo checks if the GPU is AMD by parsing vainfo output
+func (hs *HardwareService) isAMDGPUViaVAInfo() bool {
+	cmd := exec.Command("vainfo")
+	output, err := cmd.Output()
+	if err != nil {
+		return false
+	}
 
+	outputStr := strings.ToLower(string(output))
 
+	// AMD GPUs typically show as "AMD", "Radeon", or "AMDGPU" in vainfo
+	// Intel shows as "Intel", "i965", "iHD"
+	return strings.Contains(outputStr, "amd") ||
+		strings.Contains(outputStr, "radeon") ||
+		strings.Contains(outputStr, "amdgpu driver")
+}
 
+// GetGPUCapabilities returns GPU encoding and decoding capabilities
+func (hs *HardwareService) GetGPUCapabilities() *model.GPUCapabilities {
+	caps := &model.GPUCapabilities{}
 
+	// Check Intel VA-API
+	if vaInfo := hs.getIntelVAInfo(); vaInfo != nil {
+		caps.HasIntelVA = true
+		caps.IntelVA = vaInfo
+	}
+
+	// Check NVIDIA
+	caps.HasNVIDIA = hs.detectNVIDIA()
+
+	// Check AMD
+	caps.HasAMD = hs.detectAMD()
+
+	return caps
+}
+
+// getIntelVAInfo parses vainfo output to get Intel VA-API capabilities
+func (hs *HardwareService) getIntelVAInfo() *model.VAInfo {
+	cmd := exec.Command("vainfo")
+	output, err := cmd.Output()
+	if err != nil {
+		return nil
+	}
+
+	info := &model.VAInfo{
+		DecodeProfiles: []string{},
+		EncodeProfiles: []string{},
+	}
+
+	scanner := bufio.NewScanner(strings.NewReader(string(output)))
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+
+		// Count profiles and entrypoints
+		if strings.Contains(line, "VAProfile") {
+			info.ProfileCount++
+
+			// Parse profile details
+			if strings.Contains(line, "VAEntrypointVLD") {
+				// Decode profile
+				profile := extractProfileName(line)
+				if profile != "" {
+					info.DecodeProfiles = append(info.DecodeProfiles, profile)
+				}
+			} else if strings.Contains(line, "VAEntrypointEncSlice") ||
+				strings.Contains(line, "VAEntrypointEncSliceLP") {
+				// Encode profile
+				profile := extractProfileName(line)
+				if profile != "" {
+					info.EncodeProfiles = append(info.EncodeProfiles, profile)
+				}
+			}
+		}
+		if strings.Contains(line, "VAEntrypoint") {
+			info.EntrypointCount++
+		}
+	}
+
+	// Remove duplicates
+	info.DecodeProfiles = unique(info.DecodeProfiles)
+	info.EncodeProfiles = unique(info.EncodeProfiles)
+
+	if info.ProfileCount == 0 {
+		return nil
+	}
+
+	return info
+}
+
+// extractProfileName extracts the codec profile name from vainfo line
+func extractProfileName(line string) string {
+	// Example: "VAProfileH264Main: VAEntrypointVLD"
+	parts := strings.Split(line, ":")
+	if len(parts) < 2 {
+		return ""
+	}
+
+	profile := strings.TrimSpace(parts[0])
+	// Remove VAProfile prefix
+	profile = strings.TrimPrefix(profile, "VAProfile")
+
+	// Clean up common profile names
+	profile = strings.ReplaceAll(profile, "H264", "H.264")
+	profile = strings.ReplaceAll(profile, "HEVC", "H.265/HEVC")
+	profile = strings.ReplaceAll(profile, "VP8", "VP8")
+	profile = strings.ReplaceAll(profile, "VP9", "VP9")
+	profile = strings.ReplaceAll(profile, "AV1", "AV1")
+	profile = strings.ReplaceAll(profile, "JPEG", "JPEG")
+
+	return profile
+}
+
+// unique removes duplicate strings from a slice
+func unique(slice []string) []string {
+	keys := make(map[string]bool)
+	result := []string{}
+	for _, entry := range slice {
+		if _, exists := keys[entry]; !exists {
+			keys[entry] = true
+			result = append(result, entry)
+		}
+	}
+	return result
+}

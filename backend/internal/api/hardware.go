@@ -25,6 +25,12 @@ func (h *HardwareHandler) GetHardwareInfo(c *gin.Context) {
 	c.JSON(http.StatusOK, info)
 }
 
+// GetGPUCapabilities handles GET /api/hardware/capabilities
+func (h *HardwareHandler) GetGPUCapabilities(c *gin.Context) {
+	caps := h.hardwareService.GetGPUCapabilities()
+	c.JSON(http.StatusOK, caps)
+}
+
 
 
 

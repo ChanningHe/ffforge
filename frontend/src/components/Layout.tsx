@@ -1,5 +1,6 @@
+import { ReactNode } from 'react'
 import { Outlet } from 'react-router-dom'
-import { Languages, Sun, Moon, Monitor } from 'lucide-react'
+import { Languages, Sun, Moon, Monitor, Github } from 'lucide-react'
 import { AppSidebar } from './app-sidebar'
 import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar'
 import { Button } from '@/components/ui/button'
@@ -11,7 +12,11 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { useApp } from '@/contexts/AppContext'
 
-export default function Layout() {
+interface LayoutProps {
+  children?: ReactNode
+}
+
+export default function Layout({ children }: LayoutProps) {
   const { t, setLanguage, theme, setTheme } = useApp()
 
   const themeIcons = {
@@ -30,6 +35,23 @@ export default function Layout() {
           <SidebarTrigger className="-ml-1" />
           
           <div className="flex items-center gap-2">
+            {/* GitHub Link */}
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="h-9 w-9"
+              asChild
+            >
+              <a 
+                href="https://github.com/ChanningHe/ffforge" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                aria-label="GitHub Repository"
+              >
+                <Github className="h-4 w-4" />
+              </a>
+            </Button>
+
             {/* Language Selector */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -74,7 +96,7 @@ export default function Layout() {
           </div>
         </header>
         <div className="flex flex-1 flex-col p-6 overflow-auto">
-          <Outlet />
+          {children || <Outlet />}
         </div>
       </SidebarInset>
     </SidebarProvider>
