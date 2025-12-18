@@ -195,9 +195,10 @@ func (hs *HardwareService) GetGPUCapabilities() *model.GPUCapabilities {
 	// Check AMD
 	caps.HasAMD = hs.detectAMD()
 
-	// Update cache
+	// Update cache with current timestamp
 	hs.cacheMutex.Lock()
 	hs.capabilitiesCache = caps
+	hs.cacheTime = time.Now()
 	hs.cacheMutex.Unlock()
 
 	return caps
