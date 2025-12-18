@@ -1,0 +1,209 @@
+name: Build and Test
+
+on:
+  push:
+    # branches:
+    #   - main
+    #   - develop
+  pull_request:
+    branches:
+      - main
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  # Build Docker images for multiple architectures
+  build-docker:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            # Tag with branch name for branch pushes
+            type=ref,event=branch
+            # Tag with PR number for pull requests
+            type=ref,event=pr
+            # Add commit SHA as tag
+            type=sha,prefix={{branch}}-
+            # Add short SHA
+            type=sha,format=short
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # Build macOS desktop app
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install Wails CLI
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
+
+      - name: Install dependencies
+        run: |
+          cd backend && go mod download
+          cd ../frontend && npm ci
+
+      - name: Build frontend
+        run: cd frontend && npm run build
+
+      - name: Prepare desktop build
+        run: |
+          mkdir -p backend/cmd/desktop/frontend
+          cp -r frontend/dist backend/cmd/desktop/frontend/
+
+      - name: Build desktop app (macOS ARM64)
+        run: |
+          cd backend/cmd/desktop
+          wails build -platform darwin/arm64
+
+      - name: Create DMG (optional)
+        run: |
+          # You can add create-dmg here if needed
+          echo "DMG creation skipped (add create-dmg if needed)"
+
+      - name: Prepare artifact
+        run: |
+          cd backend/cmd/desktop/build/bin
+          zip -r ffforge-desktop-macos-arm64.zip ffforge-desktop.app
+
+      - name: Upload macOS artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ffforge-desktop-macos-arm64
+          path: backend/cmd/desktop/build/bin/ffforge-desktop-macos-arm64.zip
+          retention-days: 30
+
+  # Build Windows desktop app
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install Wails CLI
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
+
+      - name: Install dependencies
+        run: |
+          cd backend
+          go mod download
+          cd ../frontend
+          npm ci
+
+      - name: Build frontend
+        run: |
+          cd frontend
+          npm run build
+
+      - name: Prepare desktop build
+        run: |
+          New-Item -ItemType Directory -Force -Path backend/cmd/desktop/frontend
+          Copy-Item -Recurse -Force frontend/dist/* backend/cmd/desktop/frontend/
+        shell: pwsh
+
+      - name: Build desktop app (Windows AMD64)
+        run: |
+          cd backend/cmd/desktop
+          wails build -platform windows/amd64
+
+      - name: Create installer (optional)
+        run: |
+          # You can add NSIS installer creation here if needed
+          echo "Installer creation skipped (add NSIS if needed)"
+
+      - name: Prepare artifact
+        run: |
+          cd backend/cmd/desktop/build/bin
+          Compress-Archive -Path ffforge-desktop.exe -DestinationPath ffforge-desktop-windows-amd64.zip
+        shell: pwsh
+
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ffforge-desktop-windows-amd64
+          path: backend/cmd/desktop/build/bin/ffforge-desktop-windows-amd64.zip
+          retention-days: 30
+
+  # Summary job to check overall status
+  build-summary:
+    needs: [build-docker, build-macos, build-windows]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Check build status
+        run: |
+          echo "Docker build: ${{ needs.build-docker.result }}"
+          echo "macOS build: ${{ needs.build-macos.result }}"
+          echo "Windows build: ${{ needs.build-windows.result }}"
+          
+          if [ "${{ needs.build-docker.result }}" != "success" ] || \
+             [ "${{ needs.build-macos.result }}" != "success" ] || \
+             [ "${{ needs.build-windows.result }}" != "success" ]; then
+            echo "One or more builds failed"
+            exit 1
+          fi
+          
+          echo "All builds completed successfully!"
+          echo ""
+          echo "📦 Artifacts are available in the Actions tab"
+          echo "🐳 Docker images are pushed to ghcr.io/${{ github.repository }}"
+

@@ -1,0 +1,260 @@
+name: Create Release
+
+# Only trigger on version tags
+on:
+  push:
+    tags:
+      - 'v*'
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  # Build Docker images
+  build-docker:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            # Version tags
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            # Always tag as 'latest' for releases
+            type=raw,value=latest
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # Build macOS desktop app
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install Wails CLI
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
+
+      - name: Install dependencies
+        run: |
+          cd backend && go mod download
+          cd ../frontend && npm ci
+
+      - name: Build frontend
+        run: cd frontend && npm run build
+
+      - name: Prepare desktop build
+        run: |
+          mkdir -p backend/cmd/desktop/frontend
+          cp -r frontend/dist backend/cmd/desktop/frontend/
+
+      - name: Build desktop app (macOS ARM64)
+        run: |
+          cd backend/cmd/desktop
+          wails build -platform darwin/arm64
+
+      - name: Prepare artifact
+        run: |
+          cd backend/cmd/desktop/build/bin
+          zip -r ffforge-desktop-macos-arm64.zip ffforge-desktop.app
+
+      - name: Upload macOS artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ffforge-desktop-macos-arm64
+          path: backend/cmd/desktop/build/bin/ffforge-desktop-macos-arm64.zip
+
+  # Build Windows desktop app
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install Wails CLI
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
+
+      - name: Install dependencies
+        run: |
+          cd backend
+          go mod download
+          cd ../frontend
+          npm ci
+
+      - name: Build frontend
+        run: |
+          cd frontend
+          npm run build
+
+      - name: Prepare desktop build
+        run: |
+          New-Item -ItemType Directory -Force -Path backend/cmd/desktop/frontend
+          Copy-Item -Recurse -Force frontend/dist/* backend/cmd/desktop/frontend/
+        shell: pwsh
+
+      - name: Build desktop app (Windows AMD64)
+        run: |
+          cd backend/cmd/desktop
+          wails build -platform windows/amd64
+
+      - name: Prepare artifact
+        run: |
+          cd backend/cmd/desktop/build/bin
+          Compress-Archive -Path ffforge-desktop.exe -DestinationPath ffforge-desktop-windows-amd64.zip
+        shell: pwsh
+
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ffforge-desktop-windows-amd64
+          path: backend/cmd/desktop/build/bin/ffforge-desktop-windows-amd64.zip
+
+  # Create GitHub Release
+  create-release:
+    needs: [build-docker, build-macos, build-windows]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download macOS artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ffforge-desktop-macos-arm64
+          path: ./artifacts
+
+      - name: Download Windows artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ffforge-desktop-windows-amd64
+          path: ./artifacts
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          # Get the previous tag
+          PREV_TAG=$(git describe --abbrev=0 --tags $(git rev-list --tags --skip=1 --max-count=1) 2>/dev/null || echo "")
+          
+          if [ -z "$PREV_TAG" ]; then
+            echo "changelog=First release" >> $GITHUB_OUTPUT
+          else
+            # Generate changelog from commits
+            CHANGELOG=$(git log ${PREV_TAG}..HEAD --pretty=format:"- %s (%h)" --no-merges)
+            echo "changelog<<EOF" >> $GITHUB_OUTPUT
+            echo "$CHANGELOG" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            artifacts/ffforge-desktop-macos-arm64.zip
+            artifacts/ffforge-desktop-windows-amd64.zip
+          draft: false
+          prerelease: ${{ contains(github.ref, 'alpha') || contains(github.ref, 'beta') || contains(github.ref, 'rc') }}
+          generate_release_notes: true
+          body: |
+            ## 🎉 FFForge ${{ github.ref_name }}
+            
+            ### 📦 Installation
+            
+            #### Docker (推荐)
+            ```bash
+            # Pull the latest image
+            docker pull ghcr.io/${{ github.repository }}:latest
+            
+            # Or pull specific version
+            docker pull ghcr.io/${{ github.repository }}:${{ github.ref_name }}
+            
+            # Run
+            docker-compose up -d
+            ```
+            
+            #### Desktop Applications
+            
+            **macOS (Apple Silicon)**
+            - Download: `ffforge-desktop-macos-arm64.zip`
+            - Extract and move to Applications folder
+            - First run: Right-click → Open (bypass Gatekeeper)
+            
+            **Windows (x64)**
+            - Download: `ffforge-desktop-windows-amd64.zip`
+            - Extract and run `ffforge-desktop.exe`
+            
+            ### 📝 Changes
+            
+            ${{ steps.changelog.outputs.changelog }}
+            
+            ### 🐳 Docker Images
+            
+            Available for:
+            - `linux/amd64` (Intel/AMD processors)
+            - `linux/arm64` (ARM processors, e.g., Raspberry Pi)
+            
+            ### ⚠️ Requirements
+            
+            - FFmpeg (bundled in Docker, required for desktop)
+            - FFprobe (bundled in Docker, required for desktop)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
