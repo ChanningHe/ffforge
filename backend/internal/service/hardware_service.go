@@ -2,63 +2,128 @@ package service
 
 import (
 	"bufio"
+	"context"
 	"ffmpeg-web/internal/model"
-	"os"
+	"log"
 	"os/exec"
 	"strings"
+	"sync"
+	"time"
 )
 
 // HardwareService handles hardware detection
-type HardwareService struct{}
+type HardwareService struct {
+	cache             *model.HardwareInfo
+	capabilitiesCache *model.GPUCapabilities
+	cacheMutex        sync.RWMutex
+	cacheTime         time.Time
+	cacheDuration     time.Duration
+	ffmpegPath        string
+}
 
 // NewHardwareService creates a new hardware service
 func NewHardwareService() *HardwareService {
-	return &HardwareService{}
+	hs := &HardwareService{
+		cacheDuration: 5 * time.Minute, // Cache for 5 minutes
+		ffmpegPath:    "ffmpeg",        // Default to PATH
+	}
+	return hs
 }
 
-// DetectHardware detects available hardware acceleration options
+// SetFFmpegPath sets the FFmpeg binary path for hardware detection
+func (hs *HardwareService) SetFFmpegPath(path string) {
+	hs.ffmpegPath = path
+	// Clear cache to force re-detection with new path
+	hs.cacheMutex.Lock()
+	hs.cache = nil
+	hs.capabilitiesCache = nil
+	hs.cacheMutex.Unlock()
+	// Trigger background detection
+	go hs.DetectHardware()
+}
+
+// DetectHardware detects available hardware acceleration options with caching
 func (hs *HardwareService) DetectHardware() *model.HardwareInfo {
+	// Check cache first
+	hs.cacheMutex.RLock()
+	if hs.cache != nil && time.Since(hs.cacheTime) < hs.cacheDuration {
+		cached := hs.cache
+		hs.cacheMutex.RUnlock()
+		return cached
+	}
+	hs.cacheMutex.RUnlock()
+
+	// Perform detection with timeout
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
 	info := &model.HardwareInfo{
 		CPU: true, // CPU is always available
 	}
 
-	// Detect NVIDIA GPU
-	info.NVIDIA = hs.detectNVIDIA()
-	if info.NVIDIA {
-		info.GPUName = hs.getNVIDIAGPUName()
+	// Detect in parallel with timeout
+	type result struct {
+		nvidia  bool
+		gpuName string
+		intel   bool
+		amd     bool
+	}
+	resultChan := make(chan result, 1)
+
+	go func() {
+		r := result{}
+		r.nvidia = hs.detectNVIDIAWithTimeout(ctx)
+		if r.nvidia {
+			r.gpuName = hs.getNVIDIAGPUNameWithTimeout(ctx)
+		}
+		r.intel = hs.detectIntelQSVWithTimeout(ctx)
+		r.amd = hs.detectAMDWithTimeout(ctx)
+		resultChan <- r
+	}()
+
+	select {
+	case r := <-resultChan:
+		info.NVIDIA = r.nvidia
+		info.GPUName = r.gpuName
+		info.Intel = r.intel
+		info.AMD = r.amd
+	case <-ctx.Done():
+		// Timeout - return CPU only
 	}
 
-	// Detect Intel QSV
-	info.Intel = hs.detectIntelQSV()
-
-	// Detect AMD GPU
-	info.AMD = hs.detectAMD()
+	// Update cache
+	hs.cacheMutex.Lock()
+	hs.cache = info
+	hs.cacheTime = time.Now()
+	hs.cacheMutex.Unlock()
 
 	return info
 }
 
 // detectNVIDIA checks if NVIDIA GPU is available
 func (hs *HardwareService) detectNVIDIA() bool {
-	// Check for nvidia-smi
-	cmd := exec.Command("nvidia-smi", "--query-gpu=name", "--format=csv,noheader")
-	if err := cmd.Run(); err != nil {
+	return hs.detectNVIDIAWithTimeout(context.Background())
+}
+
+// detectNVIDIAWithTimeout checks if NVIDIA GPU is available with timeout
+func (hs *HardwareService) detectNVIDIAWithTimeout(ctx context.Context) bool {
+	// Check if NVIDIA hardware exists (platform-specific)
+	if !detectNVIDIAPlatform() {
 		return false
 	}
 
-	// Check if FFmpeg supports CUDA/NVENC
-	cmd = exec.Command("ffmpeg", "-hide_banner", "-encoders")
-	output, err := cmd.Output()
-	if err != nil {
-		return false
-	}
-
-	outputStr := string(output)
-	return strings.Contains(outputStr, "hevc_nvenc") || strings.Contains(outputStr, "h264_nvenc")
+	log.Println("✓ NVIDIA GPU enabled for encoding")
+	return true
 }
 
 // getNVIDIAGPUName gets the NVIDIA GPU name
 func (hs *HardwareService) getNVIDIAGPUName() string {
-	cmd := exec.Command("nvidia-smi", "--query-gpu=name", "--format=csv,noheader")
+	return hs.getNVIDIAGPUNameWithTimeout(context.Background())
+}
+
+// getNVIDIAGPUNameWithTimeout gets the NVIDIA GPU name with timeout
+func (hs *HardwareService) getNVIDIAGPUNameWithTimeout(ctx context.Context) string {
+	cmd := exec.CommandContext(ctx, "nvidia-smi", "--query-gpu=name", "--format=csv,noheader")
 	output, err := cmd.Output()
 	if err != nil {
 		return ""
@@ -69,94 +134,59 @@ func (hs *HardwareService) getNVIDIAGPUName() string {
 
 // detectIntelQSV checks if Intel Quick Sync Video is available
 func (hs *HardwareService) detectIntelQSV() bool {
-	// Check for /dev/dri/renderD* devices (Linux)
-	entries, err := os.ReadDir("/dev/dri")
-	if err != nil {
+	return hs.detectIntelQSVWithTimeout(context.Background())
+}
+
+// detectIntelQSVWithTimeout checks if Intel Quick Sync Video is available with timeout
+func (hs *HardwareService) detectIntelQSVWithTimeout(ctx context.Context) bool {
+	// Check if Intel hardware exists (platform-specific)
+	if !detectIntelQSVPlatform() {
 		return false
 	}
 
-	hasRenderDevice := false
-	for _, entry := range entries {
-		if strings.HasPrefix(entry.Name(), "renderD") {
-			hasRenderDevice = true
-			break
-		}
-	}
-
-	if !hasRenderDevice {
-		return false
-	}
-
-	// Check if FFmpeg supports QSV
-	cmd := exec.Command("ffmpeg", "-hide_banner", "-encoders")
-	output, err := cmd.Output()
-	if err != nil {
-		return false
-	}
-
-	outputStr := string(output)
-	return strings.Contains(outputStr, "hevc_qsv") || strings.Contains(outputStr, "h264_qsv")
+	log.Println("✓ Intel GPU enabled for encoding")
+	return true
 }
 
 // detectAMD checks if AMD GPU acceleration is available
 func (hs *HardwareService) detectAMD() bool {
-	// First check if FFmpeg supports AMF encoders
-	// This works on all platforms (Windows, Linux with ROCm)
-	cmd := exec.Command("ffmpeg", "-hide_banner", "-encoders")
-	output, err := cmd.Output()
-	if err != nil {
-		return false
-	}
-
-	outputStr := string(output)
-	hasAMFEncoder := strings.Contains(outputStr, "hevc_amf") || strings.Contains(outputStr, "h264_amf")
-
-	if !hasAMFEncoder {
-		return false
-	}
-
-	// On Linux, we need to differentiate AMD from Intel using vainfo
-	// Both use /dev/dri devices, but vainfo output differs
-	if _, err := os.Stat("/dev/dri"); err == nil {
-		// Linux system with DRI
-		// Use vainfo to check if it's AMD GPU
-		if isAMDGPU := hs.isAMDGPUViaVAInfo(); isAMDGPU {
-			return true
-		}
-		// If vainfo doesn't detect AMD, but AMF encoder exists,
-		// might be using proprietary driver or ROCm
-		return hasAMFEncoder
-	}
-
-	// On Windows/macOS, if AMF encoder exists, it's AMD
-	return hasAMFEncoder
+	return hs.detectAMDWithTimeout(context.Background())
 }
 
-// isAMDGPUViaVAInfo checks if the GPU is AMD by parsing vainfo output
-func (hs *HardwareService) isAMDGPUViaVAInfo() bool {
-	cmd := exec.Command("vainfo")
-	output, err := cmd.Output()
-	if err != nil {
+// detectAMDWithTimeout checks if AMD GPU acceleration is available with timeout
+func (hs *HardwareService) detectAMDWithTimeout(ctx context.Context) bool {
+	// Check if AMD hardware exists (platform-specific)
+	if !detectAMDPlatform() {
 		return false
 	}
 
-	outputStr := strings.ToLower(string(output))
-
-	// AMD GPUs typically show as "AMD", "Radeon", or "AMDGPU" in vainfo
-	// Intel shows as "Intel", "i965", "iHD"
-	return strings.Contains(outputStr, "amd") ||
-		strings.Contains(outputStr, "radeon") ||
-		strings.Contains(outputStr, "amdgpu driver")
+	log.Println("✓ AMD GPU enabled for encoding")
+	return true
 }
 
-// GetGPUCapabilities returns GPU encoding and decoding capabilities
+// GetGPUCapabilities returns GPU encoding and decoding capabilities with caching
 func (hs *HardwareService) GetGPUCapabilities() *model.GPUCapabilities {
+	// Check cache first
+	hs.cacheMutex.RLock()
+	if hs.capabilitiesCache != nil && time.Since(hs.cacheTime) < hs.cacheDuration {
+		cached := hs.capabilitiesCache
+		hs.cacheMutex.RUnlock()
+		return cached
+	}
+	hs.cacheMutex.RUnlock()
+
 	caps := &model.GPUCapabilities{}
 
-	// Check Intel VA-API
+	// Check Intel
+	// Unix/Linux: Use vainfo for detailed capabilities (helps distinguish Intel from AMD)
+	// Windows: Just check if Intel GPU exists
 	if vaInfo := hs.getIntelVAInfo(); vaInfo != nil {
 		caps.HasIntelVA = true
 		caps.IntelVA = vaInfo
+	} else if hs.detectIntelQSV() {
+		// Intel GPU detected via platform-specific method (e.g., Windows)
+		caps.HasIntelVA = true
+		caps.IntelVA = nil // No detailed VA-API info on Windows
 	}
 
 	// Check NVIDIA
@@ -164,6 +194,11 @@ func (hs *HardwareService) GetGPUCapabilities() *model.GPUCapabilities {
 
 	// Check AMD
 	caps.HasAMD = hs.detectAMD()
+
+	// Update cache
+	hs.cacheMutex.Lock()
+	hs.capabilitiesCache = caps
+	hs.cacheMutex.Unlock()
 
 	return caps
 }

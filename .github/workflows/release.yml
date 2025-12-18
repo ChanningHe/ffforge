@@ -11,7 +11,7 @@ env:
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
-  # Build Docker images
+  # Build Docker images (multi-arch for release)
   build-docker:
     runs-on: ubuntu-latest
     permissions:
@@ -47,7 +47,7 @@ jobs:
             # Always tag as 'latest' for releases
             type=raw,value=latest
 
-      - name: Build and push Docker image
+      - name: Build and push Docker image (multi-arch)
         uses: docker/build-push-action@v5
         with:
           context: .
@@ -55,8 +55,11 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
+          cache-from: |
+            type=gha,scope=amd64
+            type=gha,scope=arm64
           cache-to: type=gha,mode=max
+          provenance: false
 
   # Build macOS desktop app
   build-macos:
@@ -90,8 +93,8 @@ jobs:
 
       - name: Prepare desktop build
         run: |
-          mkdir -p backend/cmd/desktop/frontend
-          cp -r frontend/dist backend/cmd/desktop/frontend/
+          mkdir -p backend/cmd/desktop/frontend/dist
+          cp -r frontend/dist/* backend/cmd/desktop/frontend/dist/
 
       - name: Build desktop app (macOS ARM64)
         run: |
@@ -145,8 +148,8 @@ jobs:
 
       - name: Prepare desktop build
         run: |
-          New-Item -ItemType Directory -Force -Path backend/cmd/desktop/frontend
-          Copy-Item -Recurse -Force frontend/dist/* backend/cmd/desktop/frontend/
+          New-Item -ItemType Directory -Force -Path backend/cmd/desktop/frontend/dist
+          Copy-Item -Recurse -Force frontend/dist/* backend/cmd/desktop/frontend/dist/
         shell: pwsh
 
       - name: Build desktop app (Windows AMD64)
@@ -157,7 +160,9 @@ jobs:
       - name: Prepare artifact
         run: |
           cd backend/cmd/desktop/build/bin
-          Compress-Archive -Path ffforge-desktop.exe -DestinationPath ffforge-desktop-windows-amd64.zip
+          mkdir -p release
+          Copy-Item ffforge-desktop.exe release/
+          Compress-Archive -Path release/* -DestinationPath ffforge-desktop-windows-amd64.zip
         shell: pwsh
 
       - name: Upload Windows artifact

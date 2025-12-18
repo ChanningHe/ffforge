@@ -1,5 +1,6 @@
 import { useEffect, useRef, useCallback } from 'react'
 import type { ProgressUpdate } from '@/types'
+import { getServerURL } from '@/lib/config'
 
 interface UseWebSocketOptions {
   onMessage: (data: ProgressUpdate) => void
@@ -15,10 +16,9 @@ export function useWebSocket({ onMessage, onOpen, onClose, onError }: UseWebSock
   const maxReconnectAttempts = 5
 
   const connect = useCallback(() => {
-    // Determine WebSocket URL
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-    const host = window.location.host
-    const wsUrl = `${protocol}//${host}/api/ws/progress`
+    // Determine WebSocket URL (supports both web and desktop modes)
+    const serverURL = getServerURL()
+    const wsUrl = serverURL.replace('http://', 'ws://').replace('https://', 'wss://') + '/api/ws/progress'
 
     try {
       const ws = new WebSocket(wsUrl)

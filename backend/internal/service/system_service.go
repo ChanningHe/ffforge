@@ -1,12 +1,9 @@
 package service
 
 import (
-	"bufio"
 	"ffmpeg-web/internal/model"
 	"log"
-	"os"
 	"runtime"
-	"strings"
 	"sync"
 	"time"
 
@@ -81,25 +78,10 @@ func (s *SystemService) GetHostInfo() (*model.HostInfo, error) {
 	}, nil
 }
 
-// getOSInfo reads OS information from /etc/os-release
-func getOSInfo() (name, version string) {
-	file, err := os.Open("/etc/os-release")
-	if err != nil {
-		return "", ""
-	}
-	defer file.Close()
-
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		line := scanner.Text()
-		if strings.HasPrefix(line, "NAME=") {
-			name = strings.Trim(strings.TrimPrefix(line, "NAME="), "\"")
-		} else if strings.HasPrefix(line, "VERSION_ID=") {
-			version = strings.Trim(strings.TrimPrefix(line, "VERSION_ID="), "\"")
-		}
-	}
-	return name, version
-}
+// getOSInfo reads OS information
+// Platform-specific implementations:
+// - system_service_unix.go for Unix/Linux
+// - system_service_windows.go for Windows
 
 // StartMonitoring starts collecting system metrics
 func (s *SystemService) StartMonitoring() {

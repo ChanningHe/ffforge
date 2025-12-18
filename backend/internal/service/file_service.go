@@ -10,13 +10,23 @@ import (
 
 // FileService handles file system operations
 type FileService struct {
-	dataPath string
+	dataPath            string
+	allowFullFileSystem bool // For desktop app
 }
 
 // NewFileService creates a new file service
 func NewFileService(dataPath string) *FileService {
 	return &FileService{
-		dataPath: dataPath,
+		dataPath:            dataPath,
+		allowFullFileSystem: false,
+	}
+}
+
+// NewFileServiceWithFullAccess creates a file service with full filesystem access (for desktop app)
+func NewFileServiceWithFullAccess(dataPath string) *FileService {
+	return &FileService{
+		dataPath:            dataPath,
+		allowFullFileSystem: true,
 	}
 }
 
@@ -50,22 +60,25 @@ func (fs *FileService) BrowseDirectory(pathParam string) ([]*model.FileInfo, err
 		}
 	}
 
-	// Check if path exists and is within data path
-	absFullPath, err := filepath.Abs(fullPath)
-	if err != nil {
-		return nil, fmt.Errorf("invalid path: %w", err)
-	}
+	// For web version, check if path is within data directory
+	// For desktop version, allow full filesystem access
+	if !fs.allowFullFileSystem {
+		absFullPath, err := filepath.Abs(fullPath)
+		if err != nil {
+			return nil, fmt.Errorf("invalid path: %w", err)
+		}
 
-	absDataPath, err := filepath.Abs(fs.dataPath)
-	if err != nil {
-		return nil, fmt.Errorf("invalid data path: %w", err)
-	}
+		absDataPath, err := filepath.Abs(fs.dataPath)
+		if err != nil {
+			return nil, fmt.Errorf("invalid data path: %w", err)
+		}
 
-	// Use filepath.Rel to ensure the path is within data directory
-	// This prevents attacks like /data-secret when dataPath is /data
-	relPath, err := filepath.Rel(absDataPath, absFullPath)
-	if err != nil || strings.HasPrefix(relPath, "..") {
-		return nil, fmt.Errorf("access denied: path outside data directory")
+		// Use filepath.Rel to ensure the path is within data directory
+		// This prevents attacks like /data-secret when dataPath is /data
+		relPath, err := filepath.Rel(absDataPath, absFullPath)
+		if err != nil || strings.HasPrefix(relPath, "..") {
+			return nil, fmt.Errorf("access denied: path outside data directory")
+		}
 	}
 
 	// Read directory

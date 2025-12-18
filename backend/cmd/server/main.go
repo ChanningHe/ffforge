@@ -40,6 +40,7 @@ func main() {
 	// Initialize services
 	fileService := service.NewFileService(config.DataPath)
 	hardwareService := service.NewHardwareService()
+	hardwareService.SetFFmpegPath(config.FFmpegPath)
 	ffmpegService := service.NewFFmpegService(config.FFmpegPath, config.FFprobePath, config.OutputPath)
 	systemService := service.NewSystemService()
 	systemService.StartMonitoring()

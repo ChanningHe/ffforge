@@ -1,31 +1,35 @@
-# Frontend
-frontend/node_modules
-frontend/dist
-frontend/.env.local
-frontend/.env.production.local
-
-# Backend
-backend/server
+# Binaries for programs and plugins
 *.exe
 *.exe~
 *.dll
 *.so
 *.dylib
+
+# Test binary, built with `go test -c`
 *.test
+
+# Output of the go coverage tool
 *.out
 
-# Database
-database/*.db
-database/*.db-shm
-database/*.db-wal
+# Go workspace file
+go.work
 
-# Config
-config/*.json
-!config/presets.example.json
+# Dependency directories
+node_modules/
+vendor/
+
+# Build outputs
+backend/server
+backend/desktop
+backend/cmd/desktop/build/
+backend/cmd/desktop/frontend/
+desktop/build/
+frontend/dist/
+frontend/node_modules/
 
 # IDE
-.idea/
 .vscode/
+.idea/
 *.swp
 *.swo
 *~
@@ -38,5 +42,29 @@ Thumbs.db
 *.log
 logs/
 
-# Dev
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Environment
+.env
+.env.local
+
+# Output and data directories
+output/
+data/
 devfile/
+
+# Config (keep example files)
+config/*
+!config/*.example.*
+
+# Docker
+docker-compose.override.yml
+
+# FFmpeg binaries (downloaded during build)
+backend/embed/ffmpeg/darwin/
+backend/embed/ffmpeg/windows/
+backend/embed/ffmpeg/tmp/
+scripts/ffmpeg-cache/

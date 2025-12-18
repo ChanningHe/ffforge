@@ -14,9 +14,53 @@ env:
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
-  # Build Docker images for multiple architectures
-  build-docker:
+  # Build Docker image for AMD64 (fast, native)
+  build-docker-amd64:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha,prefix={{branch}}-
+            type=sha,format=short
+
+      - name: Build and push AMD64 image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=amd64
+          cache-to: type=gha,mode=max,scope=amd64
+          provenance: false
+
+  # Build Docker image for ARM64 (only on main/develop for speed)
+  build-docker-arm64:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
     permissions:
       contents: read
       packages: write
@@ -43,25 +87,21 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
-            # Tag with branch name for branch pushes
             type=ref,event=branch
-            # Tag with PR number for pull requests
-            type=ref,event=pr
-            # Add commit SHA as tag
             type=sha,prefix={{branch}}-
-            # Add short SHA
             type=sha,format=short
 
-      - name: Build and push Docker image
+      - name: Build and push ARM64 image
         uses: docker/build-push-action@v5
         with:
           context: .
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=arm64
+          cache-to: type=gha,mode=max,scope=arm64
+          provenance: false
 
   # Build macOS desktop app
   build-macos:
@@ -93,15 +133,28 @@ jobs:
       - name: Build frontend
         run: cd frontend && npm run build
 
+      - name: Download FFmpeg
+        run: ./scripts/download-ffmpeg.sh darwin
+
       - name: Prepare desktop build
         run: |
-          mkdir -p backend/cmd/desktop/frontend
-          cp -r frontend/dist backend/cmd/desktop/frontend/
+          mkdir -p backend/cmd/desktop/frontend/dist
+          cp -r frontend/dist/* backend/cmd/desktop/frontend/dist/
 
       - name: Build desktop app (macOS ARM64)
         run: |
           cd backend/cmd/desktop
           wails build -platform darwin/arm64
+      
+      - name: Bundle FFmpeg into app
+        run: |
+          if [ -f backend/embed/ffmpeg/darwin/ffmpeg ]; then
+            mkdir -p backend/cmd/desktop/build/bin/ffforge-desktop.app/Contents/Resources/ffmpeg
+            cp backend/embed/ffmpeg/darwin/ffmpeg backend/embed/ffmpeg/darwin/ffprobe \
+               backend/cmd/desktop/build/bin/ffforge-desktop.app/Contents/Resources/ffmpeg/
+            chmod +x backend/cmd/desktop/build/bin/ffforge-desktop.app/Contents/Resources/ffmpeg/*
+            echo "✓ FFmpeg bundled"
+          fi
 
       - name: Create DMG (optional)
         run: |
@@ -154,48 +207,59 @@ jobs:
           cd frontend
           npm run build
 
+      - name: Download FFmpeg
+        run: bash scripts/download-ffmpeg.sh windows
+        shell: bash
+
       - name: Prepare desktop build
         run: |
-          New-Item -ItemType Directory -Force -Path backend/cmd/desktop/frontend
-          Copy-Item -Recurse -Force frontend/dist/* backend/cmd/desktop/frontend/
+          New-Item -ItemType Directory -Force -Path backend/cmd/desktop/frontend/dist
+          Copy-Item -Recurse -Force frontend/dist/* backend/cmd/desktop/frontend/dist/
         shell: pwsh
 
       - name: Build desktop app (Windows AMD64)
         run: |
           cd backend/cmd/desktop
-          wails build -platform windows/amd64
-
-      - name: Create installer (optional)
+          wails build -debug -platform windows/amd64
+      
+      - name: Package Windows release with FFmpeg
         run: |
-          # You can add NSIS installer creation here if needed
-          echo "Installer creation skipped (add NSIS if needed)"
-
-      - name: Prepare artifact
-        run: |
-          cd backend/cmd/desktop/build/bin
-          Compress-Archive -Path ffforge-desktop.exe -DestinationPath ffforge-desktop-windows-amd64.zip
-        shell: pwsh
+          mkdir -p release
+          cp backend/cmd/desktop/build/bin/ffforge-desktop.exe release/
+          
+          if [ -f backend/embed/ffmpeg/windows/ffmpeg.exe ]; then
+            mkdir -p release/ffmpeg
+            cp backend/embed/ffmpeg/windows/ffmpeg.exe release/ffmpeg/
+            cp backend/embed/ffmpeg/windows/ffprobe.exe release/ffmpeg/
+            echo "✓ FFmpeg included in package"
+          else
+            echo "⚠ FFmpeg not found, package will use system FFmpeg"
+          fi
+          
+          cd release
+          7z a -tzip ffforge-desktop-windows-amd64.zip *
+        shell: bash
 
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v4
         with:
           name: ffforge-desktop-windows-amd64
-          path: backend/cmd/desktop/build/bin/ffforge-desktop-windows-amd64.zip
+          path: release/ffforge-desktop-windows-amd64.zip
           retention-days: 30
 
   # Summary job to check overall status
   build-summary:
-    needs: [build-docker, build-macos, build-windows]
-    runs-on: ubuntu-latest
+    needs: [build-docker-amd64, build-macos, build-windows]
     if: always()
+    runs-on: ubuntu-latest
     steps:
       - name: Check build status
         run: |
-          echo "Docker build: ${{ needs.build-docker.result }}"
+          echo "Docker AMD64 build: ${{ needs.build-docker-amd64.result }}"
           echo "macOS build: ${{ needs.build-macos.result }}"
           echo "Windows build: ${{ needs.build-windows.result }}"
           
-          if [ "${{ needs.build-docker.result }}" != "success" ] || \
+          if [ "${{ needs.build-docker-amd64.result }}" != "success" ] || \
              [ "${{ needs.build-macos.result }}" != "success" ] || \
              [ "${{ needs.build-windows.result }}" != "success" ]; then
             echo "One or more builds failed"

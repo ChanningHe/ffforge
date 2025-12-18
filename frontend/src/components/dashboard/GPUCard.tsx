@@ -129,107 +129,113 @@ export function GPUCard({ hardwareInfo, capabilities, loading }: GPUCardProps) {
         )}
 
         {/* Intel Content */}
-        {selectedGPU === 'intel' && hardwareInfo.intel && capabilities.hasIntelVA && capabilities.intelVA && (
+        {selectedGPU === 'intel' && hardwareInfo.intel && capabilities.hasIntelVA && (
           <div className="space-y-3">
             <div className="flex flex-wrap items-center gap-2">
               <Badge className="bg-green-500">
                 <Check className="h-3 w-3 mr-1" /> {t.home.dashboard.detected}
               </Badge>
-              <Badge variant="outline" className="text-xs">
-                {capabilities.intelVA.profileCount} {t.home.dashboard.profiles}
-              </Badge>
+              {capabilities.intelVA && (
+                <Badge variant="outline" className="text-xs">
+                  {capabilities.intelVA.profileCount} {t.home.dashboard.profiles}
+                </Badge>
+              )}
             </div>
             
-            <div className="space-y-2">
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-muted-foreground">{t.home.dashboard.decodeFormats}:</span>
-                  <span className="font-medium">{capabilities.intelVA.decodeProfiles.length}</span>
-                </div>
-                <div className="flex flex-wrap gap-1">
-                  {getKeyFormats(capabilities.intelVA.decodeProfiles).map((profile, idx) => (
-                    <Badge key={idx} variant="secondary" className="text-xs py-0 h-5">
-                      {profile}
-                    </Badge>
-                  ))}
-                  {capabilities.intelVA.decodeProfiles.length > 4 && (
-                    <Badge variant="outline" className="text-xs py-0 h-5">
-                      +{capabilities.intelVA.decodeProfiles.length - 4}
-                    </Badge>
-                  )}
-                </div>
-              </div>
-              
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-muted-foreground">{t.home.dashboard.encodeFormats}:</span>
-                  <span className="font-medium">{capabilities.intelVA.encodeProfiles.length}</span>
-                </div>
-                <div className="flex flex-wrap gap-1">
-                  {getKeyFormats(capabilities.intelVA.encodeProfiles).map((profile, idx) => (
-                    <Badge key={idx} variant="default" className="text-xs py-0 h-5">
-                      {profile}
-                    </Badge>
-                  ))}
-                  {capabilities.intelVA.encodeProfiles.length > 4 && (
-                    <Badge variant="outline" className="text-xs py-0 h-5">
-                      +{capabilities.intelVA.encodeProfiles.length - 4}
-                    </Badge>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              className="w-full h-8 text-xs"
-              onClick={() => setDialogOpen(true)}
-            >
-              {t.home.dashboard.viewFullCapabilities}
-              <ChevronRight className="ml-1 h-3 w-3" />
-            </Button>
-
-            <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-              <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-                <DialogClose onClick={() => setDialogOpen(false)} />
-                <DialogHeader>
-                  <DialogTitle>Intel VA-API {t.home.dashboard.fullCapabilities}</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4 mt-4">
-                  <div>
-                    <h4 className="font-medium mb-2 text-sm flex items-center gap-2">
-                      {t.home.dashboard.decodeFormats}
-                      <Badge variant="outline" className="text-xs">
-                        {capabilities.intelVA.decodeProfiles.length}
-                      </Badge>
-                    </h4>
-                    <div className="flex flex-wrap gap-2">
-                      {capabilities.intelVA.decodeProfiles.map((profile, idx) => (
-                        <Badge key={idx} variant="secondary">
+            {capabilities.intelVA && (
+              <>
+                <div className="space-y-2">
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-muted-foreground">{t.home.dashboard.decodeFormats}:</span>
+                      <span className="font-medium">{capabilities.intelVA.decodeProfiles.length}</span>
+                    </div>
+                    <div className="flex flex-wrap gap-1">
+                      {getKeyFormats(capabilities.intelVA.decodeProfiles).map((profile, idx) => (
+                        <Badge key={idx} variant="secondary" className="text-xs py-0 h-5">
                           {profile}
                         </Badge>
                       ))}
+                      {capabilities.intelVA.decodeProfiles.length > 4 && (
+                        <Badge variant="outline" className="text-xs py-0 h-5">
+                          +{capabilities.intelVA.decodeProfiles.length - 4}
+                        </Badge>
+                      )}
                     </div>
                   </div>
-                  <div>
-                    <h4 className="font-medium mb-2 text-sm flex items-center gap-2">
-                      {t.home.dashboard.encodeFormats}
-                      <Badge variant="outline" className="text-xs">
-                        {capabilities.intelVA.encodeProfiles.length}
-                      </Badge>
-                    </h4>
-                    <div className="flex flex-wrap gap-2">
-                      {capabilities.intelVA.encodeProfiles.map((profile, idx) => (
-                        <Badge key={idx} variant="default">
+                  
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-muted-foreground">{t.home.dashboard.encodeFormats}:</span>
+                      <span className="font-medium">{capabilities.intelVA.encodeProfiles.length}</span>
+                    </div>
+                    <div className="flex flex-wrap gap-1">
+                      {getKeyFormats(capabilities.intelVA.encodeProfiles).map((profile, idx) => (
+                        <Badge key={idx} variant="default" className="text-xs py-0 h-5">
                           {profile}
                         </Badge>
                       ))}
+                      {capabilities.intelVA.encodeProfiles.length > 4 && (
+                        <Badge variant="outline" className="text-xs py-0 h-5">
+                          +{capabilities.intelVA.encodeProfiles.length - 4}
+                        </Badge>
+                      )}
                     </div>
                   </div>
                 </div>
-              </DialogContent>
-            </Dialog>
+
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="w-full h-8 text-xs"
+                  onClick={() => setDialogOpen(true)}
+                >
+                  {t.home.dashboard.viewFullCapabilities}
+                  <ChevronRight className="ml-1 h-3 w-3" />
+                </Button>
+
+                <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+                  <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                    <DialogClose onClick={() => setDialogOpen(false)} />
+                    <DialogHeader>
+                      <DialogTitle>Intel VA-API {t.home.dashboard.fullCapabilities}</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4 mt-4">
+                      <div>
+                        <h4 className="font-medium mb-2 text-sm flex items-center gap-2">
+                          {t.home.dashboard.decodeFormats}
+                          <Badge variant="outline" className="text-xs">
+                            {capabilities.intelVA.decodeProfiles.length}
+                          </Badge>
+                        </h4>
+                        <div className="flex flex-wrap gap-2">
+                          {capabilities.intelVA.decodeProfiles.map((profile, idx) => (
+                            <Badge key={idx} variant="secondary">
+                              {profile}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                      <div>
+                        <h4 className="font-medium mb-2 text-sm flex items-center gap-2">
+                          {t.home.dashboard.encodeFormats}
+                          <Badge variant="outline" className="text-xs">
+                            {capabilities.intelVA.encodeProfiles.length}
+                          </Badge>
+                        </h4>
+                        <div className="flex flex-wrap gap-2">
+                          {capabilities.intelVA.encodeProfiles.map((profile, idx) => (
+                            <Badge key={idx} variant="default">
+                              {profile}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              </>
+            )}
           </div>
         )}
 
