@@ -7,7 +7,8 @@ WORKDIR /app/frontend
 COPY frontend/package*.json ./
 
 # Install dependencies
-RUN npm install
+# Use ci for reproducible builds, disable optional features for speed in ARM64/QEMU
+RUN npm ci --prefer-offline --no-audit --progress=false
 
 # Copy frontend source
 COPY frontend/ ./
