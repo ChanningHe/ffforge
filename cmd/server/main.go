@@ -118,8 +118,13 @@ func main() {
 
 	// Serve static files (frontend) in production
 	if _, err := os.Stat("./web"); err == nil {
-		router.StaticFile("/", "./web/index.html")
+		// Serve all static files from web directory
 		router.Static("/assets", "./web/assets")
+		router.StaticFile("/logo.png", "./web/logo.png")
+		router.StaticFile("/logo.svg", "./web/logo.svg")
+		
+		// Serve index.html for root and handle SPA routing
+		router.StaticFile("/", "./web/index.html")
 		router.NoRoute(func(c *gin.Context) {
 			c.File("./web/index.html")
 		})

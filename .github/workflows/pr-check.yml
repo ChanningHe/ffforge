@@ -27,13 +27,13 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
 
       - name: Install backend dependencies
-        run: cd backend && go mod download
+        run: go mod download
 
       - name: Install frontend dependencies
         run: cd frontend && npm ci
 
       - name: Run backend tests
-        run: cd backend && go test ./...
+        run: go test ./...
 
       - name: Run frontend linter
         run: cd frontend && npm run lint
@@ -42,7 +42,7 @@ jobs:
         run: cd frontend && npm run build
 
       - name: Build backend
-        run: cd backend && go build -o server cmd/server/main.go
+        run: go build -o cmd/server/server cmd/server/main.go
 
   # Check Docker build
   docker-build-test:

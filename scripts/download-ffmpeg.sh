@@ -6,8 +6,16 @@ PLATFORM="${1:-$(uname -s)}"
 
 case "$PLATFORM" in
   Darwin|darwin|macos)
+    FFMPEG_DIR="$SCRIPT_DIR/../embed/ffmpeg/darwin"
+    
+    # Check if FFmpeg already exists
+    if [ -f "$FFMPEG_DIR/ffmpeg" ] && [ -f "$FFMPEG_DIR/ffprobe" ]; then
+      echo "✓ macOS FFmpeg already exists, skipping download"
+      ls -lh "$FFMPEG_DIR/ffmpeg" "$FFMPEG_DIR/ffprobe"
+      exit 0
+    fi
+    
     echo "Downloading macOS FFmpeg..."
-    FFMPEG_DIR="$SCRIPT_DIR/../backend/embed/ffmpeg/darwin"
     mkdir -p "$FFMPEG_DIR"
     cd "$FFMPEG_DIR"
     
@@ -22,8 +30,16 @@ case "$PLATFORM" in
     ;;
     
   Windows|windows|MINGW*|MSYS*)
+    FFMPEG_DIR="$SCRIPT_DIR/../embed/ffmpeg/windows"
+    
+    # Check if FFmpeg already exists
+    if [ -f "$FFMPEG_DIR/ffmpeg.exe" ] && [ -f "$FFMPEG_DIR/ffprobe.exe" ]; then
+      echo "✓ Windows FFmpeg already exists, skipping download"
+      ls -lh "$FFMPEG_DIR/ffmpeg.exe" "$FFMPEG_DIR/ffprobe.exe"
+      exit 0
+    fi
+    
     echo "Downloading Windows FFmpeg..."
-    FFMPEG_DIR="$SCRIPT_DIR/../backend/embed/ffmpeg/windows"
     mkdir -p "$FFMPEG_DIR"
     cd "$FFMPEG_DIR"
     

@@ -1,6 +1,7 @@
 // Settings page for global configuration
 import { useState, useEffect } from 'react'
 import { useApp } from '@/contexts/AppContext'
+import { APP_VERSION } from '@/version'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
@@ -448,7 +449,7 @@ export default function SettingsPage() {
             <CardContent className="space-y-3 text-sm">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Version</span>
-                <span className="font-medium">v1.0.0</span>
+                <span className="font-medium">v{APP_VERSION}</span>
               </div>
               <Separator />
               <div className="flex justify-between">
