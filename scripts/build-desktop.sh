@@ -4,11 +4,18 @@ set -euo pipefail
 # Build Desktop Application
 # Usage: ./scripts/build-desktop.sh [debug|release] [platform]
 
+# Get script directory and project root
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
 BUILD_MODE="${1:-release}"
 PLATFORM="${2:-}"
 
+# Change to project root
+cd "$PROJECT_ROOT"
+
 echo "📦 Syncing version from package.json..."
-./scripts/sync-version.sh
+bash scripts/sync-version.sh
 
 echo "📋 Preparing build directory..."
 mkdir -p build

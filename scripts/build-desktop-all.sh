@@ -4,16 +4,23 @@ set -euo pipefail
 # Build Desktop Application for All Platforms
 # Usage: ./scripts/build-desktop-all.sh
 
+# Get script directory and project root
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+# Change to project root
+cd "$PROJECT_ROOT"
+
 echo "📦 Syncing version from package.json..."
-./scripts/sync-version.sh
+bash scripts/sync-version.sh
 
 echo "📋 Preparing build directory..."
 mkdir -p build
 cp images/icon.png build/appicon.png
 
 echo "📦 Downloading FFmpeg for all platforms..."
-./scripts/download-ffmpeg.sh darwin
-./scripts/download-ffmpeg.sh windows
+bash scripts/download-ffmpeg.sh darwin
+bash scripts/download-ffmpeg.sh windows
 
 echo "🎨 Building frontend..."
 cd frontend && VITE_APP_VERSION=$(node -p "require('./package.json').version") npm run build && cd ..

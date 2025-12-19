@@ -98,9 +98,7 @@ jobs:
         run: ./scripts/download-ffmpeg.sh darwin
 
       - name: Sync version
-        run: |
-          chmod +x scripts/sync-version.sh
-          ./scripts/sync-version.sh
+        run: bash scripts/sync-version.sh
 
       - name: Prepare build directory
         run: |
@@ -154,9 +152,7 @@ jobs:
         shell: bash
 
       - name: Sync version
-        run: |
-          chmod +x scripts/sync-version.sh
-          ./scripts/sync-version.sh
+        run: bash scripts/sync-version.sh
         shell: bash
 
       - name: Prepare build directory
@@ -169,6 +165,7 @@ jobs:
         run: |
           cd frontend
           VITE_APP_VERSION=$(node -p "require('./package.json').version") npm run build
+        shell: bash
 
       - name: Build desktop app (Windows AMD64)
         run: wails build -platform windows/amd64
