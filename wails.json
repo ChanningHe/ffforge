@@ -4,20 +4,19 @@
   "outputfilename": "ffforge-desktop",
   "frontend:install": "echo 'Frontend dependencies already installed'",
   "frontend:build": "echo 'Frontend already built'",
-  "frontend:dev:watcher": "cd ../../../frontend && npm run dev",
+  "frontend:dev:watcher": "cd frontend && npm run dev",
   "frontend:dev:serverUrl": "auto",
   "assetdir": "frontend/dist",
-  "wailsjsdir": "../../../frontend/src",
-  "outputdir": "../../../desktop/build",
+  "wailsjsdir": "frontend/src",
   "author": {
     "name": "FFForge Team",
-    "email": "support@ffforge.io"
+    "email": "channinghey@gmail.com"
   },
   "info": {
     "companyName": "FFForge",
     "productName": "FFForge Desktop",
-    "productVersion": "1.0.0",
-    "copyright": "Copyright © 2024 FFForge Team",
+    "productVersion": "0.1.0",
+    "copyright": "Copyright © 2025 FFForge",
     "comments": "Video transcoding application with H.265/AV1 encoding support"
   },
   "nsrequiresaquakeyboardaccess": false

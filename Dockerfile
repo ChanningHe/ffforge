@@ -13,8 +13,8 @@ RUN npm ci --prefer-offline --no-audit --progress=false
 # Copy frontend source
 COPY frontend/ ./
 
-# Build frontend
-RUN npm run build
+# Build frontend with version
+RUN VITE_APP_VERSION=$(node -p "require('./package.json').version") npm run build
 
 # Stage 2: Build backend
 FROM golang:1.22-alpine AS backend-builder
@@ -25,13 +25,15 @@ WORKDIR /app
 RUN apk add --no-cache gcc musl-dev sqlite-dev sqlite-static
 
 # Copy go mod files
-COPY backend/go.* ./
+COPY go.* ./
 
 # Download dependencies
 RUN go mod download
 
-# Copy backend source
-COPY backend/ ./
+# Copy backend source (internal, pkg, cmd)
+COPY internal/ ./internal/
+COPY pkg/ ./pkg/
+COPY cmd/ ./cmd/
 
 # Build backend with static linking
 # This produces a fully static binary that works on any Linux

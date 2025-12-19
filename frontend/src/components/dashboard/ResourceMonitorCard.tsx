@@ -125,8 +125,8 @@ export function ResourceMonitorCard({ current, history, onRefreshIntervalChange,
         </div>
 
         {/* Chart */}
-        <div className="h-[300px] w-full">
-          <ResponsiveContainer width="100%" height="100%">
+        <div className="h-[300px] w-full min-h-[300px]">
+          <ResponsiveContainer width="100%" height={300}>
             <AreaChart data={chartData}>
               <defs>
                 <linearGradient id={`color${resourceType}`} x1="0" y1="0" x2="0" y2="1">

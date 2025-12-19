@@ -60,8 +60,14 @@ export default function Sidebar({ collapsed = false, onToggle }: SidebarProps) {
     )}>
       {/* Logo */}
       <div className="flex h-14 items-center border-b px-4">
-        <FileVideo className={cn("h-5 w-5 flex-shrink-0", !collapsed && "mr-2")} />
-        {!collapsed && <span className="text-lg font-bold">FFForge</span>}
+        {collapsed ? (
+          <img src="/logo.png" alt="FFForge" className="h-5 w-5 flex-shrink-0" />
+        ) : (
+          <>
+            <img src="/logo.png" alt="FFForge" className="h-6 w-6 mr-2" />
+            <span className="text-lg font-bold">FFForge</span>
+          </>
+        )}
       </div>
 
       {/* Collapse Toggle Button */}

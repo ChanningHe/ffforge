@@ -2,6 +2,7 @@
 import { Link, useLocation } from 'react-router-dom'
 import { FileVideo, ListChecks, Home, History, Settings, Sparkles } from 'lucide-react'
 import { useApp } from '@/contexts/AppContext'
+import { APP_VERSION } from '@/version'
 import {
   Sidebar,
   SidebarContent,
@@ -55,12 +56,12 @@ export function AppSidebar() {
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild>
               <Link to="/">
-                <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-                  <FileVideo className="size-4" />
+                <div className="flex aspect-square size-8 items-center justify-center rounded-lg">
+                  <img src="/logo.png" alt="FFForge" className="size-8 rounded-lg" />
                 </div>
                 <div className="flex flex-col gap-0.5 leading-none">
                   <span className="font-semibold">FFForge</span>
-                  <span className="text-xs">v1.0.0</span>
+                  <span className="text-xs">v{APP_VERSION}</span>
                 </div>
               </Link>
             </SidebarMenuButton>

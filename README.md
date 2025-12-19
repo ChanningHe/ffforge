@@ -1,26 +1,32 @@
 # FFForge
 
+> **!!** This project is under active development. Breaking changes may occur. **!!**
+
 A modern web application for video transcoding with H.265/AV1 encoding support.
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 [![Docker](https://img.shields.io/badge/Docker-Ready-blue)](Dockerfile)
 
-![](./doc/PageHP.jpg)
+![](./images/PageHP.jpg)
 ## Features
 
 - Web-based file browser
 - Batch processing with real-time progress
-- Hardware acceleration (NVIDIA, Intel QSV, AMD) (WIP)
+- Hardware acceleration (NVIDIA, Intel QSV)
 - Customize any FFmpeg command arguments
 - Preset management
 - Task queue system
+- Desktop application (macOS/Windows)
 
 ## Roadmap
 - [x] File permission management
 - [x] NVIDIA GPU Transcoder confirm
+- [x] Intel QSV Transcoder confirm
 - [ ] Intel QSV / NVIDIA Preset
 - [x] Homepage refact
-- [ ] Desktop application support
+- [x] Desktop application support
+- [ ] macOS GPU support
+- [ ] AMD GPU support
 - [ ] Remote agent transcoding
 
 
@@ -100,33 +106,41 @@ volumes:
   - ./output:/output
 ```
 
-## Environment Variables
-
-- `PORT` - Server port (default: 8080)
-- `DATA_PATH` - Input files directory (default: /data)
-- `OUTPUT_PATH` - Output files directory (default: /output)
-- `MAX_CONCURRENT_TASKS` - Maximum concurrent transcoding tasks (default: 2)
-
 ## ScreenShoot
-![](./doc/PageVT.jpg)
-![](./doc/PagePM.jpg)
+![](./images/PageVT.jpg)
+![](./images/PagePM.jpg)
 
 ## Hardware Acceleration
 
 ### Intel QSV
 
+- ✅ Tested on Linux with Intel Arc Pro B50 (AV1,H265)
+- ✅ Tested on Windows with Intel UHD 770 (H265)
+
 Works out of the box with the standard Docker image.
 
-### NVIDIA/AMD (WIP)
+### NVIDIA
+
+- ✅ Tested on Linux with Nvidia P400 (H265)
+- ✅ Tested on Windows with Nvidia RTX3070 (H265)
+
+Works out of the box with the standard Docker image.
+
+### AMD
+
+⚠️ Not tested yet
 
 ## Tech Stack
 
 - **Backend**: Go 1.22, Gin, SQLite
 - **Frontend**: React 18, TypeScript, TailwindCSS
-- **FFmpeg**: Latest with [jellyfin-ffmpeg](https://github.com/jellyfin/jellyfin-ffmpeg)
+- **Desktop**: Wails v2 (macOS/Windows builds available, more testing needed)
+- **FFmpeg**: Powered by [jellyfin-ffmpeg](https://github.com/jellyfin/jellyfin-ffmpeg) with comprehensive GPU transcoding support
+
+> Special thanks to [jellyfin-ffmpeg](https://github.com/jellyfin/jellyfin-ffmpeg) for providing comprehensive FFmpeg builds with GPU transcoding support.
 
 ## License
 
 GNU General Public License v3.0 - see [LICENSE](LICENSE) file for details.
 
-This project uses FFmpeg, which is licensed under GPL v2 or later. The static FFmpeg  are provided by [jellyfin-ffmpeg](https://github.com/jellyfin/jellyfin-ffmpeg)
+This project uses FFmpeg, which is licensed under GPL v2 or later. 

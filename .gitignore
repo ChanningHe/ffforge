@@ -19,11 +19,8 @@ node_modules/
 vendor/
 
 # Build outputs
-backend/server
-backend/desktop
-backend/cmd/desktop/build/
-backend/cmd/desktop/frontend/
-desktop/build/
+cmd/server/server
+build/
 frontend/dist/
 frontend/node_modules/
 
@@ -55,6 +52,8 @@ logs/
 output/
 data/
 devfile/
+embed/
+.build/
 
 # Config (keep example files)
 config/*
@@ -64,7 +63,7 @@ config/*
 docker-compose.override.yml
 
 # FFmpeg binaries (downloaded during build)
-backend/embed/ffmpeg/darwin/
-backend/embed/ffmpeg/windows/
-backend/embed/ffmpeg/tmp/
+embed/ffmpeg/darwin/
+embed/ffmpeg/windows/
+embed/ffmpeg/tmp/
 scripts/ffmpeg-cache/

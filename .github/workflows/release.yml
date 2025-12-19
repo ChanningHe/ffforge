@@ -91,32 +91,35 @@ jobs:
 
       - name: Install dependencies
         run: |
-          cd backend && go mod download
-          cd ../frontend && npm ci
+          go mod download
+          cd frontend && npm ci
 
-      - name: Build frontend
-        run: cd frontend && npm run build
+      - name: Download FFmpeg
+        run: ./scripts/download-ffmpeg.sh darwin
 
-      - name: Prepare desktop build
+      - name: Sync version
         run: |
-          mkdir -p backend/cmd/desktop/frontend/dist
-          cp -r frontend/dist/* backend/cmd/desktop/frontend/dist/
+          chmod +x scripts/sync-version.sh
+          ./scripts/sync-version.sh
+
+      - name: Prepare build directory
+        run: |
+          mkdir -p build
+          cp images/icon.png build/appicon.png
 
       - name: Build desktop app (macOS ARM64)
-        run: |
-          cd backend/cmd/desktop
-          wails build -platform darwin/arm64
+        run: ./scripts/build-desktop.sh release darwin/arm64
 
       - name: Prepare artifact
         run: |
-          cd backend/cmd/desktop/build/bin
+          cd build/bin
           zip -r ffforge-desktop-macos-arm64.zip ffforge-desktop.app
 
       - name: Upload macOS artifact
         uses: actions/upload-artifact@v4
         with:
           name: ffforge-desktop-macos-arm64
-          path: backend/cmd/desktop/build/bin/ffforge-desktop-macos-arm64.zip
+          path: build/bin/ffforge-desktop-macos-arm64.zip
 
   # Build Windows desktop app
   build-windows:
@@ -142,30 +145,37 @@ jobs:
 
       - name: Install dependencies
         run: |
-          cd backend
           go mod download
-          cd ../frontend
+          cd frontend
           npm ci
+
+      - name: Download FFmpeg
+        run: ./scripts/download-ffmpeg.sh windows
+        shell: bash
+
+      - name: Sync version
+        run: |
+          chmod +x scripts/sync-version.sh
+          ./scripts/sync-version.sh
+        shell: bash
+
+      - name: Prepare build directory
+        run: |
+          mkdir -p build
+          cp images/icon.png build/appicon.png
+        shell: bash
 
       - name: Build frontend
         run: |
           cd frontend
-          npm run build
-
-      - name: Prepare desktop build
-        run: |
-          New-Item -ItemType Directory -Force -Path backend/cmd/desktop/frontend/dist
-          Copy-Item -Recurse -Force frontend/dist/* backend/cmd/desktop/frontend/dist/
-        shell: pwsh
+          VITE_APP_VERSION=$(node -p "require('./package.json').version") npm run build
 
       - name: Build desktop app (Windows AMD64)
-        run: |
-          cd backend/cmd/desktop
-          wails build -platform windows/amd64
+        run: wails build -platform windows/amd64
 
       - name: Prepare artifact
         run: |
-          cd backend/cmd/desktop/build/bin
+          cd build/bin
           mkdir -p release
           Copy-Item ffforge-desktop.exe release/
           Compress-Archive -Path release/* -DestinationPath ffforge-desktop-windows-amd64.zip
@@ -175,7 +185,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ffforge-desktop-windows-amd64
-          path: backend/cmd/desktop/build/bin/ffforge-desktop-windows-amd64.zip
+          path: build/bin/ffforge-desktop-windows-amd64.zip
 
   # Create GitHub Release
   create-release:
