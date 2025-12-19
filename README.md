@@ -38,7 +38,7 @@ A modern web application for video transcoding with H.265/AV1 encoding support.
 services:
   ffforge:
     container_name: ffforge
-    image: channinghe/ffforge:latest
+    image: ghcr.io/channinghe/ffforge:latest
     restart: unless-stopped
     ports:
       - "38110:8080"
