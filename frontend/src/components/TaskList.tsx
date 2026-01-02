@@ -191,122 +191,130 @@ export default function TaskList() {
       <div className="flex-1 min-h-0">
         <div className="h-full grid grid-cols-12 gap-4">
           {/* Left: Task List - 67% */}
-          <div className="col-span-8 overflow-auto border rounded-lg bg-card">
+          <div className="col-span-8 flex flex-col border rounded-lg bg-card">
             {isLoading ? (
               <div className="flex items-center justify-center h-32">
                 <p className="text-muted-foreground">{t.common.loading}</p>
               </div>
             ) : (
-              <div className="p-3">
-                {/* Select All */}
-                {activeTasks.length > 0 && (
-                  <div className="mb-3 pb-3 border-b">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={selectAllTasks}
-                      className="w-full justify-start"
-                    >
-                      {selectedTasks.length === activeTasks.length ? (
-                        <CheckSquare className="h-4 w-4 mr-2" />
-                      ) : (
-                        <Square className="h-4 w-4 mr-2" />
-                      )}
-                      {t.tasks.selectAll}
-                    </Button>
-                  </div>
-                )}
-
-                {activeTasks.length === 0 ? (
-                  <p className="text-center text-muted-foreground py-8">
-                    {t.tasks.noTasks}
-                  </p>
-                ) : (
-                  <div className="space-y-2">
-                    {paginatedTasks.map((task) => {
-                      const isSelected = selectedTasks.includes(task.id)
-                      const isActive = selectedTask?.id === task.id
-
-                      return (
-                        <div
-                          key={task.id}
-                          className={cn(
-                            "p-3 rounded-md transition-colors cursor-pointer",
-                            "hover:bg-accent",
-                            isActive && "bg-accent",
-                            isSelected && "bg-primary/5 border-l-2 border-primary"
-                          )}
-                          onClick={() => setSelectedTask(task)}
+              <div className="flex flex-col flex-1 min-h-0">
+                <div className="flex-1 overflow-auto p-3">
+                  {/* Toolbar */}
+                  {activeTasks.length > 0 && (
+                    <div className="flex items-center justify-between bg-muted/40 p-2 rounded-md mb-2">
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={selectAllTasks}
+                          className="hover:bg-background"
                         >
-                          <div className="flex items-start gap-3">
-                            {/* Checkbox */}
-                            <div
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                toggleTaskSelection(task.id)
-                              }}
-                              className="flex-shrink-0 pt-1"
-                            >
-                              {isSelected ? (
-                                <CheckSquare className="h-4 w-4 text-primary" />
-                              ) : (
-                                <Square className="h-4 w-4 text-muted-foreground" />
-                              )}
-                            </div>
+                          {selectedTasks.length === activeTasks.length ? (
+                            <CheckSquare className="h-4 w-4 mr-2 text-primary" />
+                          ) : (
+                            <Square className="h-4 w-4 mr-2 text-muted-foreground" />
+                          )}
+                          <span className="font-medium">{t.tasks.selectAll}</span>
+                        </Button>
+                        {selectedTasks.length > 0 && (
+                          <span className="text-xs text-muted-foreground">
+                            {selectedTasks.length} selected
+                          </span>
+                        )}
+                      </div>
 
-                            {/* Task info */}
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-start justify-between gap-2 mb-1">
-                                <p className="font-medium text-sm truncate" title={task.sourceFile}>
-                                  {task.sourceFile.split('/').pop() || task.sourceFile}
-                                </p>
-                                <Badge variant={getStatusVariant(task.status)} className="flex-shrink-0">
-                                  {t.tasks.status[task.status]}
-                                </Badge>
+                      <Pagination
+                        currentPage={currentPage}
+                        totalItems={totalItems}
+                        pageSize={pageSize}
+                        onPageChange={setCurrentPage}
+                        onPageSizeChange={handlePageSizeChange}
+                        className="gap-4 h-8"
+                      />
+                    </div>
+                  )}
+
+                  {activeTasks.length === 0 ? (
+                    <p className="text-center text-muted-foreground py-8">
+                      {t.tasks.noTasks}
+                    </p>
+                  ) : (
+                    <div className="space-y-2">
+                      {paginatedTasks.map((task) => {
+                        const isSelected = selectedTasks.includes(task.id)
+                        const isActive = selectedTask?.id === task.id
+
+                        return (
+                          <div
+                            key={task.id}
+                            className={cn(
+                              "p-3 rounded-md transition-colors cursor-pointer",
+                              "hover:bg-accent",
+                              isActive && "bg-accent",
+                              isSelected && "bg-primary/5 border-l-2 border-primary"
+                            )}
+                            onClick={() => setSelectedTask(task)}
+                          >
+                            <div className="flex items-start gap-3">
+                              {/* Checkbox */}
+                              <div
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  toggleTaskSelection(task.id)
+                                }}
+                                className="flex-shrink-0 pt-1"
+                              >
+                                {isSelected ? (
+                                  <CheckSquare className="h-4 w-4 text-primary" />
+                                ) : (
+                                  <Square className="h-4 w-4 text-muted-foreground" />
+                                )}
                               </div>
 
-                              {task.status === 'running' && (
-                                <div className="space-y-1">
-                                  <Progress value={task.progress} className="h-1" />
-                                  <div className="flex items-center justify-between text-xs text-muted-foreground">
-                                    <span>{task.progress.toFixed(1)}%</span>
-                                    {task.speed > 0 && (
-                                      <span className="flex items-center gap-2">
-                                        <span>{formatSpeed(task.speed)}</span>
-                                        {task.eta > 0 && (
-                                          <span>· {formatDuration(task.eta)}</span>
-                                        )}
-                                      </span>
-                                    )}
-                                  </div>
-                                </div>
-                              )}
-
-                              {task.status === 'pending' && (
-                                <div className="space-y-1">
-                                  <Progress value={0} className="h-1" />
-                                  <p className="text-xs text-muted-foreground">
-                                    {t.tasks.status.pending}
+                              {/* Task info */}
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-start justify-between gap-2 mb-1">
+                                  <p className="font-medium text-sm truncate" title={task.sourceFile}>
+                                    {task.sourceFile.split('/').pop() || task.sourceFile}
                                   </p>
+                                  <Badge variant={getStatusVariant(task.status)} className="flex-shrink-0">
+                                    {t.tasks.status[task.status]}
+                                  </Badge>
                                 </div>
-                              )}
+
+                                {task.status === 'running' && (
+                                  <div className="space-y-1">
+                                    <Progress value={task.progress} className="h-1" />
+                                    <div className="flex items-center justify-between text-xs text-muted-foreground">
+                                      <span>{task.progress.toFixed(1)}%</span>
+                                      {task.speed > 0 && (
+                                        <span className="flex items-center gap-2">
+                                          <span>{formatSpeed(task.speed)}</span>
+                                          {task.eta > 0 && (
+                                            <span>· {formatDuration(task.eta)}</span>
+                                          )}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {task.status === 'pending' && (
+                                  <div className="space-y-1">
+                                    <Progress value={0} className="h-1" />
+                                    <p className="text-xs text-muted-foreground">
+                                      {t.tasks.status.pending}
+                                    </p>
+                                  </div>
+                                )}
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-                )}
-                {/* Pagination */}
-                {activeTasks.length > 0 && (
-                  <Pagination
-                    currentPage={currentPage}
-                    totalItems={totalItems}
-                    pageSize={pageSize}
-                    onPageChange={setCurrentPage}
-                    onPageSizeChange={handlePageSizeChange}
-                  />
-                )}
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
               </div>
             )}
           </div>
