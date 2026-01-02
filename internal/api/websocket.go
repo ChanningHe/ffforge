@@ -19,22 +19,47 @@ var upgrader = websocket.Upgrader{
 	},
 }
 
+// safeConn wraps a WebSocket connection with a write mutex to prevent concurrent writes
+type safeConn struct {
+	conn    *websocket.Conn
+	writeMu sync.Mutex
+}
+
+// WriteJSON safely writes JSON to the WebSocket connection
+func (sc *safeConn) WriteJSON(v interface{}) error {
+	sc.writeMu.Lock()
+	defer sc.writeMu.Unlock()
+	return sc.conn.WriteJSON(v)
+}
+
+// WriteMessage safely writes a message to the WebSocket connection
+func (sc *safeConn) WriteMessage(messageType int, data []byte) error {
+	sc.writeMu.Lock()
+	defer sc.writeMu.Unlock()
+	return sc.conn.WriteMessage(messageType, data)
+}
+
+// Close closes the underlying connection
+func (sc *safeConn) Close() error {
+	return sc.conn.Close()
+}
+
 // WebSocketHandler handles WebSocket connections for progress updates
 type WebSocketHandler struct {
-	clients    map[*websocket.Conn]bool
+	clients    map[*safeConn]bool
 	broadcast  chan *worker.ProgressUpdate
-	register   chan *websocket.Conn
-	unregister chan *websocket.Conn
+	register   chan *safeConn
+	unregister chan *safeConn
 	mu         sync.RWMutex
 }
 
 // NewWebSocketHandler creates a new WebSocket handler
 func NewWebSocketHandler() *WebSocketHandler {
 	handler := &WebSocketHandler{
-		clients:    make(map[*websocket.Conn]bool),
+		clients:    make(map[*safeConn]bool),
 		broadcast:  make(chan *worker.ProgressUpdate, 100),
-		register:   make(chan *websocket.Conn),
-		unregister: make(chan *websocket.Conn),
+		register:   make(chan *safeConn),
+		unregister: make(chan *safeConn),
 	}
 
 	go handler.run()
@@ -62,16 +87,19 @@ func (h *WebSocketHandler) run() {
 
 		case update := <-h.broadcast:
 			h.mu.RLock()
+			clients := make([]*safeConn, 0, len(h.clients))
 			for client := range h.clients {
-				// Send update to client
-				if err := client.WriteJSON(update); err != nil {
-					log.Printf("WebSocket write error: %v", err)
-					h.mu.RUnlock()
-					h.unregister <- client
-					h.mu.RLock()
-				}
+				clients = append(clients, client)
 			}
 			h.mu.RUnlock()
+
+			// Write to clients outside the lock to avoid deadlocks
+			for _, client := range clients {
+				if err := client.WriteJSON(update); err != nil {
+					log.Printf("WebSocket write error: %v", err)
+					h.unregister <- client
+				}
+			}
 		}
 	}
 }
@@ -84,7 +112,8 @@ func (h *WebSocketHandler) HandleWebSocket(c *gin.Context) {
 		return
 	}
 
-	h.register <- conn
+	sc := &safeConn{conn: conn}
+	h.register <- sc
 
 	// Keep connection alive with ping/pong
 	go func() {
@@ -92,8 +121,8 @@ func (h *WebSocketHandler) HandleWebSocket(c *gin.Context) {
 		defer ticker.Stop()
 
 		for range ticker.C {
-			if err := conn.WriteMessage(websocket.PingMessage, nil); err != nil {
-				h.unregister <- conn
+			if err := sc.WriteMessage(websocket.PingMessage, nil); err != nil {
+				h.unregister <- sc
 				return
 			}
 		}
@@ -103,7 +132,7 @@ func (h *WebSocketHandler) HandleWebSocket(c *gin.Context) {
 	for {
 		_, _, err := conn.ReadMessage()
 		if err != nil {
-			h.unregister <- conn
+			h.unregister <- sc
 			break
 		}
 	}

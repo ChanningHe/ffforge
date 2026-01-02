@@ -38,8 +38,9 @@ func (h *SystemHandler) GetUsage(c *gin.Context) {
 }
 
 // GetHistory handles GET /api/system/history
+// Supports query parameter: range=1h|6h|12h|24h (default: 1h)
 func (h *SystemHandler) GetHistory(c *gin.Context) {
-	history := h.systemService.GetHistory()
+	rangeStr := c.DefaultQuery("range", "1h")
+	history := h.systemService.GetHistoryWithRange(rangeStr)
 	c.JSON(http.StatusOK, gin.H{"data": history})
 }
-

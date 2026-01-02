@@ -1,14 +1,15 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Trash2, CheckCircle2, XCircle, CheckSquare, Square, Terminal } from 'lucide-react'
+import { Trash2, CheckCircle2, XCircle, CheckSquare, Square, Terminal, RotateCcw } from 'lucide-react'
 import { api } from '@/lib/api'
 import { useApp } from '@/contexts/AppContext'
+import { useCommandPreview } from '@/hooks/useCommandPreview'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { Pagination } from '@/components/ui/pagination'
 import { useToast } from '@/components/ui/toast'
-import { formatDuration, generateFFmpegCommand, formatBytes } from '@/lib/utils'
+import { formatDuration, formatBytes } from '@/lib/utils'
 import { cn } from '@/lib/utils'
 import type { Task, TaskStatus } from '@/types'
 
@@ -42,6 +43,12 @@ export default function HistoryPage() {
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
 
+  // Get command preview for selected task (when actualCommand is not available)
+  const { command: previewCommand } = useCommandPreview(
+    selectedTask?.actualCommand ? null : selectedTask?.config || null,
+    { sourceFile: selectedTask?.sourceFile }
+  )
+
   const { data: tasks, isLoading } = useQuery({
     queryKey: ['tasks'],
     queryFn: () => api.getTasks(),
@@ -73,6 +80,31 @@ export default function HistoryPage() {
     },
     onError: () => {
       showToast(t.history.deleteFailed, 'error')
+    },
+  })
+
+  const retryMutation = useMutation({
+    mutationFn: (id: string) => api.retryTask(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tasks'] })
+      showToast(t.history.retrySuccess, 'success')
+    },
+    onError: () => {
+      showToast(t.history.retryFailed, 'error')
+    },
+  })
+
+  const retryMultipleMutation = useMutation({
+    mutationFn: async (ids: string[]) => {
+      await Promise.all(ids.map(id => api.retryTask(id)))
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tasks'] })
+      showToast(t.history.retryMultipleSuccess, 'success')
+      setSelectedTasks([])
+    },
+    onError: () => {
+      showToast(t.history.retryFailed, 'error')
     },
   })
 
@@ -130,9 +162,14 @@ export default function HistoryPage() {
   }
 
   // Filter only completed, failed, and cancelled tasks
-  const completedTasks = tasks?.filter(t =>
+  // Sort by completedAt or createdAt descending (newest first)
+  const completedTasks = (tasks?.filter(t =>
     t.status === 'completed' || t.status === 'failed' || t.status === 'cancelled'
-  ) || []
+  ) || []).sort((a, b) => {
+    const aTime = new Date(a.completedAt || a.createdAt || 0).getTime()
+    const bTime = new Date(b.completedAt || b.createdAt || 0).getTime()
+    return bTime - aTime
+  })
 
   // Pagination
   const totalItems = completedTasks.length
@@ -152,14 +189,25 @@ export default function HistoryPage() {
         </div>
         <div className="flex gap-2">
           {selectedTasks.length > 0 && (
-            <Button
-              variant="destructive"
-              size="sm"
-              onClick={handleDeleteSelected}
-            >
-              <Trash2 className="h-4 w-4 mr-1" />
-              {t.history.deleteSelected} ({selectedTasks.length})
-            </Button>
+            <>
+              <Button
+                variant="default"
+                size="sm"
+                onClick={() => retryMultipleMutation.mutate(selectedTasks)}
+                disabled={retryMultipleMutation.isPending}
+              >
+                <RotateCcw className={cn("h-4 w-4 mr-1", retryMultipleMutation.isPending && "animate-spin")} />
+                {t.history.retrySelected} ({selectedTasks.length})
+              </Button>
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={handleDeleteSelected}
+              >
+                <Trash2 className="h-4 w-4 mr-1" />
+                {t.history.deleteSelected} ({selectedTasks.length})
+              </Button>
+            </>
           )}
           {completedTasks.length > 0 && (
             <Button
@@ -189,106 +237,114 @@ export default function HistoryPage() {
       <div className="flex-1 min-h-0">
         <div className="h-full grid grid-cols-12 gap-4">
           {/* Left: History List - 67% */}
-          <div className="col-span-8 overflow-auto border rounded-lg bg-card">
+          <div className="col-span-8 flex flex-col border rounded-lg bg-card">
             {isLoading ? (
               <div className="flex items-center justify-center h-32">
                 <p className="text-muted-foreground">{t.common.loading}</p>
               </div>
             ) : (
-              <div className="p-3">
-                {/* Select All */}
-                {completedTasks.length > 0 && (
-                  <div className="mb-3 pb-3 border-b">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={selectAllTasks}
-                      className="w-full justify-start"
-                    >
-                      {selectedTasks.length === completedTasks.length ? (
-                        <CheckSquare className="h-4 w-4 mr-2" />
-                      ) : (
-                        <Square className="h-4 w-4 mr-2" />
-                      )}
-                      {t.history.selectAll}
-                    </Button>
-                  </div>
-                )}
-
-                {completedTasks.length === 0 ? (
-                  <p className="text-center text-muted-foreground py-8">
-                    {t.history.noHistory}
-                  </p>
-                ) : (
-                  <div className="space-y-2">
-                    {paginatedTasks.map((task) => {
-                      const isSelected = selectedTasks.includes(task.id)
-                      const isActive = selectedTask?.id === task.id
-
-                      return (
-                        <div
-                          key={task.id}
-                          className={cn(
-                            "p-3 rounded-md transition-colors cursor-pointer",
-                            "hover:bg-accent",
-                            isActive && "bg-accent",
-                            isSelected && "bg-primary/5 border-l-2 border-primary"
-                          )}
-                          onClick={() => setSelectedTask(task)}
+              <div className="flex flex-col flex-1 min-h-0">
+                <div className="flex-1 overflow-auto p-3">
+                  {/* Toolbar */}
+                  {completedTasks.length > 0 && (
+                    <div className="flex items-center justify-between bg-muted/40 p-2 rounded-md mb-2">
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={selectAllTasks}
+                          className="hover:bg-background"
                         >
-                          <div className="flex items-start gap-3">
-                            {/* Checkbox */}
-                            <div
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                toggleTaskSelection(task.id)
-                              }}
-                              className="flex-shrink-0 pt-1"
-                            >
-                              {isSelected ? (
-                                <CheckSquare className="h-4 w-4 text-primary" />
-                              ) : (
-                                <Square className="h-4 w-4 text-muted-foreground" />
-                              )}
-                            </div>
+                          {selectedTasks.length === completedTasks.length ? (
+                            <CheckSquare className="h-4 w-4 mr-2 text-primary" />
+                          ) : (
+                            <Square className="h-4 w-4 mr-2 text-muted-foreground" />
+                          )}
+                          <span className="font-medium">{t.history.selectAll}</span>
+                        </Button>
+                        {selectedTasks.length > 0 && (
+                          <span className="text-xs text-muted-foreground">
+                            {selectedTasks.length} selected
+                          </span>
+                        )}
+                      </div>
 
-                            {/* Task info */}
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-start justify-between gap-2 mb-1">
-                                <p className="font-medium text-sm truncate" title={task.sourceFile}>
-                                  {task.sourceFile.split('/').pop() || task.sourceFile}
-                                </p>
-                                <Badge variant={getStatusVariant(task.status)} className="flex-shrink-0 flex items-center gap-1">
-                                  {getStatusIcon(task.status)}
-                                  {t.tasks.status[task.status]}
-                                </Badge>
+                      <Pagination
+                        currentPage={currentPage}
+                        totalItems={totalItems}
+                        pageSize={pageSize}
+                        onPageChange={setCurrentPage}
+                        onPageSizeChange={handlePageSizeChange}
+                        className="gap-4 h-8"
+                      />
+                    </div>
+                  )}
+
+                  {completedTasks.length === 0 ? (
+                    <p className="text-center text-muted-foreground py-8">
+                      {t.history.noHistory}
+                    </p>
+                  ) : (
+                    <div className="space-y-2">
+                      {paginatedTasks.map((task) => {
+                        const isSelected = selectedTasks.includes(task.id)
+                        const isActive = selectedTask?.id === task.id
+
+                        return (
+                          <div
+                            key={task.id}
+                            className={cn(
+                              "p-3 rounded-md transition-colors cursor-pointer",
+                              "hover:bg-accent",
+                              isActive && "bg-accent",
+                              isSelected && "bg-primary/5 border-l-2 border-primary"
+                            )}
+                            onClick={() => setSelectedTask(task)}
+                          >
+                            <div className="flex items-start gap-3">
+                              {/* Checkbox */}
+                              <div
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  toggleTaskSelection(task.id)
+                                }}
+                                className="flex-shrink-0 pt-1"
+                              >
+                                {isSelected ? (
+                                  <CheckSquare className="h-4 w-4 text-primary" />
+                                ) : (
+                                  <Square className="h-4 w-4 text-muted-foreground" />
+                                )}
                               </div>
 
-                              <p className="text-xs text-muted-foreground">
-                                {task.completedAt
-                                  ? new Date(task.completedAt).toLocaleString(language === 'zh' ? 'zh-CN' : 'en-US')
-                                  : task.createdAt
-                                    ? new Date(task.createdAt).toLocaleString(language === 'zh' ? 'zh-CN' : 'en-US')
-                                    : '-'
-                                }
-                              </p>
+                              {/* Task info */}
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-start justify-between gap-2 mb-1">
+                                  <p className="font-medium text-sm truncate" title={task.sourceFile}>
+                                    {task.sourceFile.split('/').pop() || task.sourceFile}
+                                  </p>
+                                  <Badge variant={getStatusVariant(task.status)} className="flex-shrink-0 flex items-center gap-1">
+                                    {getStatusIcon(task.status)}
+                                    {t.tasks.status[task.status]}
+                                  </Badge>
+                                </div>
+
+                                <p className="text-xs text-muted-foreground">
+                                  {task.completedAt
+                                    ? new Date(task.completedAt).toLocaleString(language === 'zh' ? 'zh-CN' : 'en-US')
+                                    : task.createdAt
+                                      ? new Date(task.createdAt).toLocaleString(language === 'zh' ? 'zh-CN' : 'en-US')
+                                      : '-'
+                                  }
+                                </p>
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-                )}
-                {/* Pagination */}
-                {completedTasks.length > 0 && (
-                  <Pagination
-                    currentPage={currentPage}
-                    totalItems={totalItems}
-                    pageSize={pageSize}
-                    onPageChange={setCurrentPage}
-                    onPageSizeChange={handlePageSizeChange}
-                  />
-                )}
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
               </div>
             )}
           </div>
@@ -352,11 +408,11 @@ export default function HistoryPage() {
                       <div className="pt-4 border-t">
                         <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-1">
                           <Terminal className="h-3 w-3" />
-                          {t.config.ffmpegCommand}
+                          {selectedTask.actualCommand ? "Executed Command" : t.config.ffmpegCommand}
                         </label>
                         <div className="mt-2 bg-muted/30 border rounded p-3">
                           <code className="text-[10px] font-mono break-all whitespace-pre-wrap text-foreground/90">
-                            {generateFFmpegCommand(selectedTask.config, selectedTask.sourceFile)}
+                            {selectedTask.actualCommand || previewCommand || 'Loading...'}
                           </code>
                         </div>
                       </div>
@@ -466,6 +522,16 @@ export default function HistoryPage() {
 
                 {/* Actions */}
                 <div className="pt-3 border-t space-y-2">
+                  <Button
+                    variant="default"
+                    size="sm"
+                    onClick={() => retryMutation.mutate(selectedTask.id)}
+                    disabled={retryMutation.isPending}
+                    className="w-full"
+                  >
+                    <RotateCcw className={cn("h-4 w-4 mr-1", retryMutation.isPending && "animate-spin")} />
+                    {t.history.retryTask}
+                  </Button>
                   <Button
                     variant="outline"
                     size="sm"

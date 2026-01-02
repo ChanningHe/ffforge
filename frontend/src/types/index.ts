@@ -20,7 +20,7 @@ export interface FileInfo {
 }
 
 // Task types
-export type TaskStatus = 'pending' | 'running' | 'completed' | 'failed' | 'cancelled'
+export type TaskStatus = 'pending' | 'paused' | 'running' | 'completed' | 'failed' | 'cancelled'
 
 export interface Task {
   id: string
@@ -38,6 +38,7 @@ export interface Task {
   completedAt?: string
   preset?: string
   config: TranscodeConfig
+  actualCommand?: string // Actual FFmpeg command executed (from backend)
 }
 
 // Transcode configuration
@@ -45,10 +46,11 @@ export type EncoderType = 'h265' | 'av1'
 export type HardwareAccel = 'cpu' | 'nvidia' | 'intel' | 'amd'
 export type AudioCodec = 'copy' | 'aac' | 'opus' | 'mp3'
 export type OutputPathType = 'source' | 'custom' | 'default' | 'overwrite'
+export type HdrMode = 'auto' // HDR handling: auto = preserve HDR when source is HDR
 
 export interface TranscodeConfig {
   mode?: 'simple' | 'advanced' // Configuration mode (default: simple)
-  
+
   // Simple mode fields (UI-based configuration)
   encoder: EncoderType
   hardwareAccel: HardwareAccel
@@ -58,6 +60,7 @@ export interface TranscodeConfig {
     resolution?: string
     fps?: string | number
     bitrate?: string
+    hdrMode?: HdrMode[] // HDR handling modes (multi-select): keep, discard
   }
   audio: {
     codec: AudioCodec
@@ -71,7 +74,7 @@ export interface TranscodeConfig {
     customPath?: string
   }
   extraParams?: string // Extra FFmpeg parameters
-  
+
   // Advanced mode field (custom CLI parameters)
   customCommand?: string // Custom FFmpeg CLI parameters (between input and output)
 }

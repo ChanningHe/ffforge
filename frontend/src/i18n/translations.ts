@@ -131,6 +131,18 @@ export const translations = {
       extraParams: 'Extra FFmpeg Parameters',
       extraParamsHint: 'Advanced FFmpeg parameters (e.g., -svtav1-params "keyint=12s:scd=1")',
       ffmpegCommand: 'FFmpeg Command Preview',
+      hdrMode: 'HDR Handling',
+      hdrModeHint: 'Control HDR/SDR handling behavior',
+      hdrModeOptions: {
+        passthrough: 'Passthrough',
+        keep: 'Keep',
+        discard: 'Discard',
+      },
+      hdrModeDesc: {
+        passthrough: 'No processing',
+        keep: 'Preserve HDR/SDR as-is',
+        discard: 'Convert HDR to SDR',
+      },
       speeds: {
         ultrafast: 'Ultra Fast',
         superfast: 'Super Fast',
@@ -151,6 +163,7 @@ export const translations = {
       status: {
         title: 'Status',
         pending: 'Pending',
+        paused: 'Paused',
         running: 'Running',
         completed: 'Completed',
         failed: 'Failed',
@@ -192,6 +205,15 @@ export const translations = {
       tasksCancelled: 'Tasks cancelled successfully',
       cancelFailed: 'Cancel failed',
       createTaskFailed: 'Failed to create task',
+      pause: 'Pause',
+      resume: 'Resume',
+      pauseTask: 'Pause Task',
+      resumeTask: 'Resume Task',
+      taskPaused: 'Task paused',
+      taskResumed: 'Task resumed',
+      pauseFailed: 'Pause failed',
+      resumeFailed: 'Resume failed',
+      pausedCount: 'Paused',
     },
     // History page
     history: {
@@ -222,6 +244,12 @@ export const translations = {
       sourceFileSize: 'Source Size',
       outputFileSize: 'Output Size',
       compressionRatio: 'Compression Ratio',
+      retry: 'Retry',
+      retryTask: 'Retry Task',
+      retrySuccess: 'Task retry submitted successfully',
+      retryFailed: 'Failed to retry task',
+      retrySelected: 'Retry Selected',
+      retryMultipleSuccess: 'Selected tasks retry submitted successfully',
     },
     // Settings page
     settings: {
@@ -450,6 +478,18 @@ export const translations = {
       extraParams: '额外 FFmpeg 参数',
       extraParamsHint: '高级 FFmpeg 参数（如：-svtav1-params "keyint=12s:scd=1"）',
       ffmpegCommand: 'FFmpeg 命令预览',
+      hdrMode: 'HDR处理',
+      hdrModeHint: '控制HDR/SDR处理方式',
+      hdrModeOptions: {
+        passthrough: '不处理',
+        keep: '保持',
+        discard: '丢弃',
+      },
+      hdrModeDesc: {
+        passthrough: '不做任何处理',
+        keep: '保持HDR/SDR原样',
+        discard: '将HDR转为SDR',
+      },
       speeds: {
         ultrafast: '极快',
         superfast: '超快',
@@ -470,6 +510,7 @@ export const translations = {
       status: {
         title: '状态',
         pending: '等待中',
+        paused: '已暂停',
         running: '转码中',
         completed: '已完成',
         failed: '失败',
@@ -511,6 +552,15 @@ export const translations = {
       tasksCancelled: '任务取消成功',
       cancelFailed: '取消失败',
       createTaskFailed: '创建任务失败',
+      pause: '暂停',
+      resume: '恢复',
+      pauseTask: '暂停任务',
+      resumeTask: '恢复任务',
+      taskPaused: '任务已暂停',
+      taskResumed: '任务已恢复',
+      pauseFailed: '暂停失败',
+      resumeFailed: '恢复失败',
+      pausedCount: '已暂停',
     },
     // 历史页面
     history: {
@@ -541,6 +591,12 @@ export const translations = {
       sourceFileSize: '源文件大小',
       outputFileSize: '输出文件大小',
       compressionRatio: '压缩比',
+      retry: '重试',
+      retryTask: '重试任务',
+      retrySuccess: '任务重试已提交',
+      retryFailed: '重试任务失败',
+      retrySelected: '重试选中',
+      retryMultipleSuccess: '选中任务重试已提交',
     },
     // 设置页面
     settings: {

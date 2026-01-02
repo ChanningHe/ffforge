@@ -9,6 +9,7 @@ type TaskStatus string
 
 const (
 	TaskStatusPending   TaskStatus = "pending"
+	TaskStatusPaused    TaskStatus = "paused"
 	TaskStatusRunning   TaskStatus = "running"
 	TaskStatusCompleted TaskStatus = "completed"
 	TaskStatusFailed    TaskStatus = "failed"
@@ -32,46 +33,47 @@ type Task struct {
 	CompletedAt    *time.Time      `json:"completedAt,omitempty"`
 	Preset         string          `json:"preset,omitempty"`
 	Config         TranscodeConfig `json:"config"`
+	ActualCommand  string          `json:"actualCommand,omitempty"` // Actual FFmpeg command executed (for debugging)
 }
 
 // TranscodeConfig represents the configuration for a transcode task
 type TranscodeConfig struct {
 	// Mode: "simple" (UI-based config) or "advanced" (custom CLI)
-	Mode           string       `json:"mode,omitempty"` // simple, advanced (default: simple)
-	
+	Mode string `json:"mode,omitempty"` // simple, advanced (default: simple)
+
 	// Simple mode fields (UI-based configuration)
-	Encoder        string       `json:"encoder"` // h265, av1
-	HardwareAccel  string       `json:"hardwareAccel"` // cpu, nvidia, intel, amd
-	Video          VideoConfig  `json:"video"`
-	Audio          AudioConfig  `json:"audio"`
-	Output         OutputConfig `json:"output"`
-	ExtraParams    string       `json:"extraParams,omitempty"` // Extra FFmpeg parameters
-	
+	Encoder       string       `json:"encoder"`       // h265, av1
+	HardwareAccel string       `json:"hardwareAccel"` // cpu, nvidia, intel, amd
+	Video         VideoConfig  `json:"video"`
+	Audio         AudioConfig  `json:"audio"`
+	Output        OutputConfig `json:"output"`
+	ExtraParams   string       `json:"extraParams,omitempty"` // Extra FFmpeg parameters
+
 	// Advanced mode field (custom CLI parameters)
-	CustomCommand  string       `json:"customCommand,omitempty"` // Custom FFmpeg parameters (between input and output)
+	CustomCommand string `json:"customCommand,omitempty"` // Custom FFmpeg parameters (between input and output)
 }
 
 // VideoConfig represents video encoding configuration
 type VideoConfig struct {
-	CRF        int    `json:"crf,omitempty"`
-	Preset     string `json:"preset,omitempty"`
-	Resolution string `json:"resolution,omitempty"` // "original", "1920x1080", etc
-	FPS        string `json:"fps,omitempty"`        // "original", "30", "60", etc
-	Bitrate    string `json:"bitrate,omitempty"`
+	CRF        int      `json:"crf,omitempty"`
+	Preset     string   `json:"preset,omitempty"`
+	Resolution string   `json:"resolution,omitempty"` // "original", "1920x1080", etc
+	FPS        string   `json:"fps,omitempty"`        // "original", "30", "60", etc
+	Bitrate    string   `json:"bitrate,omitempty"`
+	HdrMode    []string `json:"hdrMode,omitempty"` // HDR handling: ["auto"] (default) or empty (passthrough)
 }
 
 // AudioConfig represents audio encoding configuration
 type AudioConfig struct {
-	Codec    string `json:"codec"`    // copy, aac, opus, mp3
+	Codec    string `json:"codec"` // copy, aac, opus, mp3
 	Bitrate  string `json:"bitrate,omitempty"`
 	Channels int    `json:"channels,omitempty"`
 }
 
 // OutputConfig represents output file configuration
 type OutputConfig struct {
-	Container  string `json:"container"` // mp4, mkv, webm
-	Suffix     string `json:"suffix"`    // filename suffix like "_h265"
-	PathType   string `json:"pathType"`  // source, custom, default, overwrite
+	Container  string `json:"container"`            // mp4, mkv, webm
+	Suffix     string `json:"suffix"`               // filename suffix like "_h265"
+	PathType   string `json:"pathType"`             // source, custom, default, overwrite
 	CustomPath string `json:"customPath,omitempty"` // custom output directory
 }
-

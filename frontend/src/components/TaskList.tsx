@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { X, CheckSquare, Square, Terminal } from 'lucide-react'
 import { api } from '@/lib/api'
 import { useWebSocket } from '@/hooks/useWebSocket'
+import { useCommandPreview } from '@/hooks/useCommandPreview'
 import { useApp } from '@/contexts/AppContext'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
@@ -10,8 +11,8 @@ import { Badge } from '@/components/ui/badge'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { Pagination } from '@/components/ui/pagination'
 import { useToast } from '@/components/ui/toast'
-import { formatSpeed, formatDuration, generateFFmpegCommand } from '@/lib/utils'
-import { cn } from '@/lib/utils'
+import { TaskItem } from '@/components/TaskItem'
+import { formatSpeed, formatDuration } from '@/lib/utils'
 import type { Task, TaskStatus, ProgressUpdate } from '@/types'
 
 const getStatusVariant = (status: TaskStatus): "default" | "secondary" | "destructive" | "outline" => {
@@ -39,6 +40,12 @@ export default function TaskList() {
   const [selectedTasks, setSelectedTasks] = useState<string[]>([])
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
+
+  // Get command preview for selected task (when actualCommand is not available)
+  const { command: previewCommand } = useCommandPreview(
+    selectedTask?.actualCommand ? null : selectedTask?.config || null,
+    { sourceFile: selectedTask?.sourceFile }
+  )
 
   const { data: tasks, isLoading } = useQuery({
     queryKey: ['tasks'],
@@ -102,6 +109,36 @@ export default function TaskList() {
     },
   })
 
+  const pauseMutation = useMutation({
+    mutationFn: (id: string) => api.pauseTask(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tasks'] })
+      showToast(t.tasks.taskPaused, 'success')
+    },
+    onError: () => {
+      showToast(t.tasks.pauseFailed, 'error')
+    },
+  })
+
+  const resumeMutation = useMutation({
+    mutationFn: (id: string) => api.resumeTask(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tasks'] })
+      showToast(t.tasks.taskResumed, 'success')
+    },
+    onError: () => {
+      showToast(t.tasks.resumeFailed, 'error')
+    },
+  })
+
+  const handlePause = (id: string) => {
+    pauseMutation.mutate(id)
+  }
+
+  const handleResume = (id: string) => {
+    resumeMutation.mutate(id)
+  }
+
   const handleCancel = (id: string) => {
     setTaskToCancel(id)
     setCancelConfirmOpen(true)
@@ -128,13 +165,16 @@ export default function TaskList() {
     }
   }
 
-  const toggleTaskSelection = (taskId: string) => {
-    if (selectedTasks.includes(taskId)) {
-      setSelectedTasks(selectedTasks.filter(id => id !== taskId))
-    } else {
-      setSelectedTasks([...selectedTasks, taskId])
-    }
-  }
+  // ! PERF: 使用 useCallback + 函数式更新，确保引用稳定
+  const toggleTaskSelection = useCallback((taskId: string) => {
+    setSelectedTasks(prev => {
+      if (prev.includes(taskId)) {
+        return prev.filter(id => id !== taskId)
+      } else {
+        return [...prev, taskId]
+      }
+    })
+  }, [])
 
   const selectAllTasks = () => {
     if (selectedTasks.length === activeTasks.length) {
@@ -144,10 +184,22 @@ export default function TaskList() {
     }
   }
 
-  // Only show active tasks (pending and running)
-  const activeTasks = tasks?.filter(t => t.status === 'running' || t.status === 'pending') || []
+  // Only show active tasks (pending, paused, and running)
+  // Sort: running tasks first, then pending, then paused, finally by createdAt descending (newest first)
+  const activeTasks = (tasks?.filter(t => t.status === 'running' || t.status === 'pending' || t.status === 'paused') || [])
+    .sort((a, b) => {
+      // Running tasks come first
+      if (a.status === 'running' && b.status !== 'running') return -1
+      if (b.status === 'running' && a.status !== 'running') return 1
+      // Then pending tasks
+      if (a.status === 'pending' && b.status === 'paused') return -1
+      if (b.status === 'pending' && a.status === 'paused') return 1
+      // Then sort by createdAt descending (newest first)
+      return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
+    })
   const runningTasks = activeTasks.filter(t => t.status === 'running')
   const pendingTasks = activeTasks.filter(t => t.status === 'pending')
+  const pausedTasks = activeTasks.filter(t => t.status === 'paused')
 
   // Pagination
   const totalItems = activeTasks.length
@@ -172,6 +224,12 @@ export default function TaskList() {
             <div className="h-3 w-3 rounded-full bg-muted"></div>
             <span className="text-sm">{t.tasks.pendingCount}: {pendingTasks.length}</span>
           </div>
+          {pausedTasks.length > 0 && (
+            <div className="flex items-center gap-2">
+              <div className="h-3 w-3 rounded-full bg-yellow-500"></div>
+              <span className="text-sm">{t.tasks.pausedCount}: {pausedTasks.length}</span>
+            </div>
+          )}
         </div>
         <div className="flex gap-2">
           {selectedTasks.length > 0 && (
@@ -191,122 +249,70 @@ export default function TaskList() {
       <div className="flex-1 min-h-0">
         <div className="h-full grid grid-cols-12 gap-4">
           {/* Left: Task List - 67% */}
-          <div className="col-span-8 overflow-auto border rounded-lg bg-card">
+          <div className="col-span-8 flex flex-col border rounded-lg bg-card">
             {isLoading ? (
               <div className="flex items-center justify-center h-32">
                 <p className="text-muted-foreground">{t.common.loading}</p>
               </div>
             ) : (
-              <div className="p-3">
-                {/* Select All */}
-                {activeTasks.length > 0 && (
-                  <div className="mb-3 pb-3 border-b">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={selectAllTasks}
-                      className="w-full justify-start"
-                    >
-                      {selectedTasks.length === activeTasks.length ? (
-                        <CheckSquare className="h-4 w-4 mr-2" />
-                      ) : (
-                        <Square className="h-4 w-4 mr-2" />
-                      )}
-                      {t.tasks.selectAll}
-                    </Button>
-                  </div>
-                )}
-
-                {activeTasks.length === 0 ? (
-                  <p className="text-center text-muted-foreground py-8">
-                    {t.tasks.noTasks}
-                  </p>
-                ) : (
-                  <div className="space-y-2">
-                    {paginatedTasks.map((task) => {
-                      const isSelected = selectedTasks.includes(task.id)
-                      const isActive = selectedTask?.id === task.id
-
-                      return (
-                        <div
-                          key={task.id}
-                          className={cn(
-                            "p-3 rounded-md transition-colors cursor-pointer",
-                            "hover:bg-accent",
-                            isActive && "bg-accent",
-                            isSelected && "bg-primary/5 border-l-2 border-primary"
-                          )}
-                          onClick={() => setSelectedTask(task)}
+              <div className="flex flex-col flex-1 min-h-0">
+                <div className="flex-1 overflow-auto p-3">
+                  {/* Toolbar */}
+                  {activeTasks.length > 0 && (
+                    <div className="flex items-center justify-between bg-muted/40 p-2 rounded-md mb-2">
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={selectAllTasks}
+                          className="hover:bg-background"
                         >
-                          <div className="flex items-start gap-3">
-                            {/* Checkbox */}
-                            <div
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                toggleTaskSelection(task.id)
-                              }}
-                              className="flex-shrink-0 pt-1"
-                            >
-                              {isSelected ? (
-                                <CheckSquare className="h-4 w-4 text-primary" />
-                              ) : (
-                                <Square className="h-4 w-4 text-muted-foreground" />
-                              )}
-                            </div>
+                          {selectedTasks.length === activeTasks.length ? (
+                            <CheckSquare className="h-4 w-4 mr-2 text-primary" />
+                          ) : (
+                            <Square className="h-4 w-4 mr-2 text-muted-foreground" />
+                          )}
+                          <span className="font-medium">{t.tasks.selectAll}</span>
+                        </Button>
+                        {selectedTasks.length > 0 && (
+                          <span className="text-xs text-muted-foreground">
+                            {selectedTasks.length} selected
+                          </span>
+                        )}
+                      </div>
 
-                            {/* Task info */}
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-start justify-between gap-2 mb-1">
-                                <p className="font-medium text-sm truncate" title={task.sourceFile}>
-                                  {task.sourceFile.split('/').pop() || task.sourceFile}
-                                </p>
-                                <Badge variant={getStatusVariant(task.status)} className="flex-shrink-0">
-                                  {t.tasks.status[task.status]}
-                                </Badge>
-                              </div>
+                      <Pagination
+                        currentPage={currentPage}
+                        totalItems={totalItems}
+                        pageSize={pageSize}
+                        onPageChange={setCurrentPage}
+                        onPageSizeChange={handlePageSizeChange}
+                        className="gap-4 h-8"
+                      />
+                    </div>
+                  )}
 
-                              {task.status === 'running' && (
-                                <div className="space-y-1">
-                                  <Progress value={task.progress} className="h-1" />
-                                  <div className="flex items-center justify-between text-xs text-muted-foreground">
-                                    <span>{task.progress.toFixed(1)}%</span>
-                                    {task.speed > 0 && (
-                                      <span className="flex items-center gap-2">
-                                        <span>{formatSpeed(task.speed)}</span>
-                                        {task.eta > 0 && (
-                                          <span>· {formatDuration(task.eta)}</span>
-                                        )}
-                                      </span>
-                                    )}
-                                  </div>
-                                </div>
-                              )}
-
-                              {task.status === 'pending' && (
-                                <div className="space-y-1">
-                                  <Progress value={0} className="h-1" />
-                                  <p className="text-xs text-muted-foreground">
-                                    {t.tasks.status.pending}
-                                  </p>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-                )}
-                {/* Pagination */}
-                {activeTasks.length > 0 && (
-                  <Pagination
-                    currentPage={currentPage}
-                    totalItems={totalItems}
-                    pageSize={pageSize}
-                    onPageChange={setCurrentPage}
-                    onPageSizeChange={handlePageSizeChange}
-                  />
-                )}
+                  {activeTasks.length === 0 ? (
+                    <p className="text-center text-muted-foreground py-8">
+                      {t.tasks.noTasks}
+                    </p>
+                  ) : (
+                    <div className="space-y-2">
+                      {paginatedTasks.map((task) => (
+                        <TaskItem
+                          key={task.id}
+                          task={task}
+                          isSelected={selectedTasks.includes(task.id)}
+                          isActive={selectedTask?.id === task.id}
+                          statusLabel={t.tasks.status[task.status]}
+                          pendingLabel={t.tasks.status.pending}
+                          onSelect={setSelectedTask}
+                          onToggleSelection={toggleTaskSelection}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             )}
           </div>
@@ -391,11 +397,11 @@ export default function TaskList() {
                       <div className="pt-4 border-t">
                         <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-1">
                           <Terminal className="h-3 w-3" />
-                          {t.config.ffmpegCommand}
+                          {selectedTask.actualCommand ? "Executed Command" : t.config.ffmpegCommand}
                         </label>
                         <div className="mt-2 bg-muted/30 border rounded p-3">
                           <code className="text-[10px] font-mono break-all whitespace-pre-wrap text-foreground/90">
-                            {generateFFmpegCommand(selectedTask.config, selectedTask.sourceFile)}
+                            {selectedTask.actualCommand || previewCommand || 'Loading...'}
                           </code>
                         </div>
                       </div>
@@ -448,6 +454,26 @@ export default function TaskList() {
 
                 {/* Actions */}
                 <div className="pt-3 border-t space-y-2">
+                  {selectedTask.status === 'pending' && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handlePause(selectedTask.id)}
+                      className="w-full"
+                    >
+                      {t.tasks.pause}
+                    </Button>
+                  )}
+                  {selectedTask.status === 'paused' && (
+                    <Button
+                      variant="default"
+                      size="sm"
+                      onClick={() => handleResume(selectedTask.id)}
+                      className="w-full"
+                    >
+                      {t.tasks.resume}
+                    </Button>
+                  )}
                   {selectedTask.status === 'running' && (
                     <Button
                       variant="destructive"

@@ -12,6 +12,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 )
@@ -174,8 +175,12 @@ func (p *Pool) processTask(taskID string) {
 		p.mu.Unlock()
 	}()
 
-	// Build FFmpeg command
-	cmd := p.ffmpegService.BuildCommand(taskCtx, sourceFile, fullOutputFile, &task.Config)
+	// Build FFmpeg command (pass videoInfo for dynamic HDR handling)
+	cmd := p.ffmpegService.BuildCommand(taskCtx, sourceFile, fullOutputFile, &task.Config, videoInfo)
+
+	// Store actual command for debugging (visible in task details)
+	task.ActualCommand = strings.Join(cmd.Args, " ")
+	p.db.UpdateTask(task)
 
 	// Get stderr pipe for progress and error messages
 	stderr, err := cmd.StderrPipe()

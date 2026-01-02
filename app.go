@@ -277,7 +277,7 @@ func (a *App) startHTTPServer() error {
 
 	// Initialize API handlers
 	filesHandler := api.NewFilesHandler(fileService, ffmpegService)
-	tasksHandler := api.NewTasksHandler(a.db, a.workerPool)
+	tasksHandler := api.NewTasksHandler(a.db, a.workerPool, fileService)
 	presetsHandler := api.NewPresetsHandler(a.db)
 	hardwareHandler := api.NewHardwareHandler(hardwareService)
 	settingsHandler := api.NewSettingsHandler(a.db.Conn())
@@ -309,6 +309,7 @@ func (a *App) startHTTPServer() error {
 		apiGroup.PUT("/tasks/:id/pause", tasksHandler.PauseTask)
 		apiGroup.PUT("/tasks/:id/resume", tasksHandler.ResumeTask)
 		apiGroup.PUT("/tasks/:id/cancel", tasksHandler.CancelTask)
+		apiGroup.POST("/tasks/:id/retry", tasksHandler.RetryTask)
 		apiGroup.DELETE("/tasks/:id", tasksHandler.DeleteTask)
 
 		// Presets
@@ -330,6 +331,10 @@ func (a *App) startHTTPServer() error {
 		apiGroup.GET("/system/host", systemHandler.GetHostInfo)
 		apiGroup.GET("/system/usage", systemHandler.GetUsage)
 		apiGroup.GET("/system/history", systemHandler.GetHistory)
+
+		// Command preview
+		commandHandler := api.NewCommandHandler(ffmpegService)
+		apiGroup.POST("/command/preview", commandHandler.PreviewCommand)
 
 		// WebSocket
 		apiGroup.GET("/ws/progress", wsHandler.HandleWebSocket)

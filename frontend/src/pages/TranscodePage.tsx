@@ -4,10 +4,10 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import { useApp } from '@/contexts/AppContext'
 import { useToast } from '@/components/ui/toast'
-import { generateFFmpegCommand } from '@/lib/utils'
+import { useCommandPreview } from '@/hooks/useCommandPreview'
 import FileBrowser from '@/components/FileBrowser'
 import ConfigPanel from '@/components/ConfigPanel'
-import { Terminal } from 'lucide-react'
+import { Terminal, Loader2 } from 'lucide-react'
 import type { TranscodeConfig } from '@/types'
 
 export default function TranscodePage() {
@@ -60,7 +60,11 @@ export default function TranscodePage() {
     createTasksMutation.mutate()
   }
 
-  const ffmpegCommand = generateFFmpegCommand(config)
+  // Get real-time command preview from backend
+  const { command: ffmpegCommand, isLoading: isCommandLoading } = useCommandPreview(config, {
+    sourceFile: selectedFiles[0], // Use first selected file for preview
+    debounceMs: 300,
+  })
 
   return (
     <div className="flex flex-1 flex-col">
@@ -68,18 +72,33 @@ export default function TranscodePage() {
         <h1>{t.transcode.title}</h1>
         <p>{t.transcode.subtitle}</p>
       </div>
-      
+
       {/* FFmpeg Command Preview */}
       <div className="bg-muted/30 border rounded-lg p-3 mb-4">
         <div className="flex items-start gap-2">
           <Terminal className="w-4 h-4 mt-0.5 text-muted-foreground flex-shrink-0" />
           <div className="flex-1 min-w-0">
-            <div className="text-xs font-medium text-muted-foreground mb-1">
-              {t.config.ffmpegCommand}
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-xs font-medium text-muted-foreground">
+                {t.config.ffmpegCommand}
+              </span>
+              {isCommandLoading && (
+                <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
+              )}
             </div>
-            <code className="text-[10px] font-mono bg-background px-2 py-1 rounded border block overflow-x-auto whitespace-pre-wrap break-all">
-              {ffmpegCommand}
-            </code>
+            {/* Fixed height container with scroll and fade animation */}
+            <div className="relative">
+              <code
+                className="text-[10px] font-mono bg-background px-2 py-1.5 rounded border block whitespace-pre-wrap break-all transition-opacity duration-200"
+                style={{ opacity: isCommandLoading && !ffmpegCommand ? 0.5 : 1 }}
+              >
+                {ffmpegCommand || (
+                  <span className="text-muted-foreground italic">
+                    {isCommandLoading ? 'Generating preview...' : 'Configure settings to see command preview'}
+                  </span>
+                )}
+              </code>
+            </div>
           </div>
         </div>
       </div>

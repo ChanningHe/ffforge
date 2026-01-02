@@ -3,6 +3,7 @@ package api
 import (
 	"ffmpeg-web/internal/database"
 	"ffmpeg-web/internal/model"
+	"ffmpeg-web/internal/service"
 	"net/http"
 	"time"
 
@@ -18,22 +19,24 @@ type WorkerPool interface {
 
 // TasksHandler handles task-related API requests
 type TasksHandler struct {
-	db   *database.DB
-	pool WorkerPool
+	db          *database.DB
+	pool        WorkerPool
+	fileService *service.FileService
 }
 
 // NewTasksHandler creates a new tasks handler
-func NewTasksHandler(db *database.DB, pool WorkerPool) *TasksHandler {
+func NewTasksHandler(db *database.DB, pool WorkerPool, fileService *service.FileService) *TasksHandler {
 	return &TasksHandler{
-		db:   db,
-		pool: pool,
+		db:          db,
+		pool:        pool,
+		fileService: fileService,
 	}
 }
 
 // CreateTaskRequest represents a request to create a new task
 type CreateTaskRequest struct {
-	SourceFiles []string              `json:"sourceFiles" binding:"required"`
-	Preset      string                `json:"preset,omitempty"`
+	SourceFiles []string               `json:"sourceFiles" binding:"required"`
+	Preset      string                 `json:"preset,omitempty"`
 	Config      *model.TranscodeConfig `json:"config,omitempty"`
 }
 
@@ -67,9 +70,32 @@ func (h *TasksHandler) CreateTask(c *gin.Context) {
 		return
 	}
 
+	// Expand directories to video files
+	// This allows selecting folders and having all videos within transcoded
+	var allSourceFiles []string
+	for _, path := range req.SourceFiles {
+		if h.fileService.IsDirectory(path) {
+			// Scan directory for video files
+			videoFiles, err := h.fileService.ScanVideoFilesInDirectory(path)
+			if err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "failed to scan directory: " + path})
+				return
+			}
+			allSourceFiles = append(allSourceFiles, videoFiles...)
+		} else {
+			allSourceFiles = append(allSourceFiles, path)
+		}
+	}
+
+	// Check if any files were found
+	if len(allSourceFiles) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "no video files found in selected paths"})
+		return
+	}
+
 	// Create tasks for each source file
-	tasks := make([]*model.Task, 0, len(req.SourceFiles))
-	for _, sourceFile := range req.SourceFiles {
+	tasks := make([]*model.Task, 0, len(allSourceFiles))
+	for _, sourceFile := range allSourceFiles {
 		task := &model.Task{
 			ID:         uuid.New().String(),
 			SourceFile: sourceFile,
@@ -147,15 +173,58 @@ func (h *TasksHandler) DeleteTask(c *gin.Context) {
 }
 
 // PauseTask handles PUT /api/tasks/:id/pause
+// Only pending tasks (not yet started) can be paused
 func (h *TasksHandler) PauseTask(c *gin.Context) {
-	// Placeholder - will be implemented with worker pool
-	c.JSON(http.StatusNotImplemented, gin.H{"error": "pause not yet implemented"})
+	id := c.Param("id")
+
+	task, err := h.db.GetTask(id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "task not found"})
+		return
+	}
+
+	// Can only pause pending tasks (not yet started)
+	if task.Status != model.TaskStatusPending {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "only pending tasks can be paused"})
+		return
+	}
+
+	task.Status = model.TaskStatusPaused
+	if err := h.db.UpdateTask(task); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to pause task"})
+		return
+	}
+
+	c.JSON(http.StatusOK, task)
 }
 
 // ResumeTask handles PUT /api/tasks/:id/resume
+// Only paused tasks can be resumed
 func (h *TasksHandler) ResumeTask(c *gin.Context) {
-	// Placeholder - will be implemented with worker pool
-	c.JSON(http.StatusNotImplemented, gin.H{"error": "resume not yet implemented"})
+	id := c.Param("id")
+
+	task, err := h.db.GetTask(id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "task not found"})
+		return
+	}
+
+	// Can only resume paused tasks
+	if task.Status != model.TaskStatusPaused {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "only paused tasks can be resumed"})
+		return
+	}
+
+	task.Status = model.TaskStatusPending
+	if err := h.db.UpdateTask(task); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to resume task"})
+		return
+	}
+
+	// Re-submit task to worker pool
+	h.pool.SubmitTask(task.ID)
+
+	c.JSON(http.StatusOK, task)
 }
 
 // CancelTask handles PUT /api/tasks/:id/cancel
@@ -184,7 +253,7 @@ func (h *TasksHandler) CancelTask(c *gin.Context) {
 		task.Status = model.TaskStatusCancelled
 		task.Error = "Task cancelled (not running in worker pool)"
 		task.CompletedAt = &now
-		
+
 		if updateErr := h.db.UpdateTask(task); updateErr != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to cancel task"})
 			return
@@ -194,3 +263,47 @@ func (h *TasksHandler) CancelTask(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "task cancelled"})
 }
 
+// RetryTask handles POST /api/tasks/:id/retry
+// Creates a new task based on an existing failed, cancelled, or completed task
+func (h *TasksHandler) RetryTask(c *gin.Context) {
+	id := c.Param("id")
+
+	// Get original task
+	originalTask, err := h.db.GetTask(id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "task not found"})
+		return
+	}
+
+	// Can only retry completed, failed, or cancelled tasks
+	if originalTask.Status != model.TaskStatusCompleted &&
+		originalTask.Status != model.TaskStatusFailed &&
+		originalTask.Status != model.TaskStatusCancelled {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "can only retry completed, failed, or cancelled tasks"})
+		return
+	}
+
+	// Create a new task with the same source file and config
+	newTask := &model.Task{
+		ID:         uuid.New().String(),
+		SourceFile: originalTask.SourceFile,
+		OutputFile: "", // Will be set by worker
+		Status:     model.TaskStatusPending,
+		Progress:   0,
+		Speed:      0,
+		ETA:        0,
+		CreatedAt:  time.Now(),
+		Preset:     originalTask.Preset,
+		Config:     originalTask.Config,
+	}
+
+	if err := h.db.CreateTask(newTask); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create task"})
+		return
+	}
+
+	// Submit task to worker pool
+	h.pool.SubmitTask(newTask.ID)
+
+	c.JSON(http.StatusOK, newTask)
+}

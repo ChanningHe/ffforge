@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Select } from '@/components/ui/select'
 import { Slider } from '@/components/ui/slider'
 import { useApp } from '@/contexts/AppContext'
-import type { TranscodeConfig, HardwareAccel, AudioCodec, OutputPathType } from '@/types'
+import type { TranscodeConfig, HardwareAccel, AudioCodec, OutputPathType, HdrMode } from '@/types'
 
 interface ConfigPanelProps {
   selectedFiles: string[]
@@ -18,7 +18,7 @@ interface ConfigPanelProps {
 
 export default function ConfigPanel({ selectedFiles, onConfigChange, initialConfig, resetTrigger }: ConfigPanelProps) {
   const { t, language } = useApp()
-  
+
   const { data: presets } = useQuery({
     queryKey: ['presets'],
     queryFn: () => api.getPresets(),
@@ -30,7 +30,7 @@ export default function ConfigPanel({ selectedFiles, onConfigChange, initialConf
   })
 
   const [selectedPreset, setSelectedPreset] = useState<string>('')
-  
+
   // Ensure initialConfig always has mode set to 'simple' by default
   const getInitialConfig = (): TranscodeConfig => {
     const baseConfig = initialConfig || {
@@ -42,6 +42,7 @@ export default function ConfigPanel({ selectedFiles, onConfigChange, initialConf
         preset: 'medium',
         resolution: 'original',
         fps: 'original',
+        hdrMode: ['auto'], // Default: auto (preserve HDR when source is HDR)
       },
       audio: {
         codec: 'copy',
@@ -60,7 +61,7 @@ export default function ConfigPanel({ selectedFiles, onConfigChange, initialConf
     // Always ensure mode is 'simple' by default
     return { ...baseConfig, mode: baseConfig.mode || 'simple' }
   }
-  
+
   const [config, setConfig] = useState<TranscodeConfig>(getInitialConfig())
 
   // Reset config when resetTrigger changes (for external control)
@@ -104,7 +105,7 @@ export default function ConfigPanel({ selectedFiles, onConfigChange, initialConf
     const options: { value: HardwareAccel; label: string }[] = [
       { value: 'cpu', label: 'CPU' },
     ]
-    
+
     if (hardware?.nvidia) {
       options.push({ value: 'nvidia', label: `NVIDIA ${hardware.gpuName || 'GPU'}` })
     }
@@ -114,7 +115,7 @@ export default function ConfigPanel({ selectedFiles, onConfigChange, initialConf
     if (hardware?.amd) {
       options.push({ value: 'amd', label: 'AMD' })
     }
-    
+
     return options
   }
 
@@ -339,19 +340,40 @@ export default function ConfigPanel({ selectedFiles, onConfigChange, initialConf
               </p>
             </div>
 
-            {/* Encoding Speed - Full width */}
-            <div>
-              <label className="block text-[11px] font-medium mb-1 text-muted-foreground">
-                {t.config.speed}
-              </label>
-              <Select
-                value={config.video.preset || (config.encoder === 'av1' && config.hardwareAccel === 'cpu' ? '6' : 'medium')}
-                onChange={(val) => setConfig({
-                  ...config,
-                  video: { ...config.video, preset: val }
-                })}
-                options={getPresetOptions()}
-              />
+            {/* Encoding Speed & HDR Handling - Two columns */}
+            <div className="grid grid-cols-2 gap-2 items-end">
+              {/* Encoding Speed */}
+              <div>
+                <label className="block text-[11px] font-medium mb-1 text-muted-foreground">
+                  {t.config.speed}
+                </label>
+                <Select
+                  value={config.video.preset || (config.encoder === 'av1' && config.hardwareAccel === 'cpu' ? '6' : 'medium')}
+                  onChange={(val) => setConfig({
+                    ...config,
+                    video: { ...config.video, preset: val }
+                  })}
+                  options={getPresetOptions()}
+                />
+              </div>
+
+              {/* HDR Handling */}
+              <div>
+                <label className="block text-[11px] font-medium mb-1 text-muted-foreground">
+                  {t.config.hdrMode}
+                </label>
+                <Select
+                  value={config.video.hdrMode?.[0] || ''}
+                  onChange={(val) => setConfig({
+                    ...config,
+                    video: { ...config.video, hdrMode: val ? [val as HdrMode] : [] }
+                  })}
+                  options={[
+                    { value: 'auto', label: language === 'zh' ? '自动' : 'Auto' },
+                    { value: '', label: language === 'zh' ? '直通' : 'Passthrough' },
+                  ]}
+                />
+              </div>
             </div>
 
             {/* Audio Codec & Output Path Type - Two columns with aligned heights */}
@@ -507,7 +529,7 @@ export default function ConfigPanel({ selectedFiles, onConfigChange, initialConf
                   ...config,
                   customCommand: e.target.value
                 })}
-                placeholder={language === 'zh' 
+                placeholder={language === 'zh'
                   ? "-hwaccel qsv -hwaccel_output_format qsv -i [[INPUT]] -c:v hevc_qsv -preset medium -global_quality 23 -c:a copy [[OUTPUT]]"
                   : "-hwaccel qsv -hwaccel_output_format qsv -i [[INPUT]] -c:v hevc_qsv -preset medium -global_quality 23 -c:a copy [[OUTPUT]]"
                 }
@@ -515,25 +537,25 @@ export default function ConfigPanel({ selectedFiles, onConfigChange, initialConf
               />
               <div className="text-[10px] text-muted-foreground mt-0.5 space-y-1">
                 <p>
-                  {language === 'zh' 
+                  {language === 'zh'
                     ? '💡 使用 [[INPUT]] 和 [[OUTPUT]] 作为占位符，它们会在运行时被替换为实际的文件路径。'
                     : '💡 Use [[INPUT]] and [[OUTPUT]] as placeholders, they will be replaced with actual file paths at runtime.'
                   }
                 </p>
                 <p className="font-medium text-primary">
-                  {language === 'zh' 
+                  {language === 'zh'
                     ? '⚠️ 注意：使用 GPU 时，-hwaccel 参数必须放在 -i [[INPUT]] 之前！'
                     : '⚠️ Note: When using GPU, -hwaccel parameters must come BEFORE -i [[INPUT]]!'
                   }
                 </p>
                 <p>
-                  {language === 'zh' 
+                  {language === 'zh'
                     ? '示例 NVIDIA：-hwaccel cuda -i [[INPUT]] -c:v hevc_nvenc -preset p4 -cq 23 -c:a copy [[OUTPUT]]'
                     : 'Example NVIDIA: -hwaccel cuda -i [[INPUT]] -c:v hevc_nvenc -preset p4 -cq 23 -c:a copy [[OUTPUT]]'
                   }
                 </p>
                 <p>
-                  {language === 'zh' 
+                  {language === 'zh'
                     ? '示例 Intel QSV：-hwaccel qsv -hwaccel_output_format qsv -i [[INPUT]] -c:v hevc_qsv -preset medium -global_quality 23 -c:a copy [[OUTPUT]]'
                     : 'Example Intel QSV: -hwaccel qsv -hwaccel_output_format qsv -i [[INPUT]] -c:v hevc_qsv -preset medium -global_quality 23 -c:a copy [[OUTPUT]]'
                   }
@@ -638,7 +660,7 @@ export default function ConfigPanel({ selectedFiles, onConfigChange, initialConf
           </>
         )}
       </CardContent>
-      
+
       {/* Fixed Footer */}
       <div className="border-t bg-muted/20 px-4 py-2.5 flex-shrink-0">
         <p className="text-[11px] font-medium text-muted-foreground">

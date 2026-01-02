@@ -56,7 +56,7 @@ func main() {
 
 	// Initialize API handlers
 	filesHandler := api.NewFilesHandler(fileService, ffmpegService)
-	tasksHandler := api.NewTasksHandler(db, workerPool)
+	tasksHandler := api.NewTasksHandler(db, workerPool, fileService)
 	presetsHandler := api.NewPresetsHandler(db)
 	hardwareHandler := api.NewHardwareHandler(hardwareService)
 	settingsHandler := api.NewSettingsHandler(db.Conn())
@@ -90,6 +90,7 @@ func main() {
 		apiGroup.PUT("/tasks/:id/pause", tasksHandler.PauseTask)
 		apiGroup.PUT("/tasks/:id/resume", tasksHandler.ResumeTask)
 		apiGroup.PUT("/tasks/:id/cancel", tasksHandler.CancelTask)
+		apiGroup.POST("/tasks/:id/retry", tasksHandler.RetryTask)
 		apiGroup.DELETE("/tasks/:id", tasksHandler.DeleteTask)
 
 		// Presets
@@ -112,6 +113,10 @@ func main() {
 		apiGroup.GET("/system/usage", systemHandler.GetUsage)
 		apiGroup.GET("/system/history", systemHandler.GetHistory)
 
+		// Command preview
+		commandHandler := api.NewCommandHandler(ffmpegService)
+		apiGroup.POST("/command/preview", commandHandler.PreviewCommand)
+
 		// WebSocket
 		apiGroup.GET("/ws/progress", wsHandler.HandleWebSocket)
 	}
@@ -122,7 +127,7 @@ func main() {
 		router.Static("/assets", "./web/assets")
 		router.StaticFile("/logo.png", "./web/logo.png")
 		router.StaticFile("/logo.svg", "./web/logo.svg")
-		
+
 		// Serve index.html for root and handle SPA routing
 		router.StaticFile("/", "./web/index.html")
 		router.NoRoute(func(c *gin.Context) {

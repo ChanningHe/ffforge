@@ -2,6 +2,7 @@ import type { FileInfo, Task, Preset, HardwareInfo, TranscodeConfig, Settings } 
 import type { HostInfo, SystemUsage, SystemHistory } from '@/types/system'
 import type { GPUCapabilities } from '@/types/hardware'
 import { getAPIBase } from './config'
+import { MockAPIClient } from './mockApi'
 
 // Get API base URL dynamically (supports both web and desktop modes)
 const getAPIBaseURL = () => getAPIBase()
@@ -63,6 +64,30 @@ class APIClient {
       method: 'PUT',
     })
     if (!response.ok) throw new Error('Failed to cancel task')
+  }
+
+  async pauseTask(id: string): Promise<Task> {
+    const response = await fetch(`${getAPIBaseURL()}/tasks/${id}/pause`, {
+      method: 'PUT',
+    })
+    if (!response.ok) throw new Error('Failed to pause task')
+    return response.json()
+  }
+
+  async resumeTask(id: string): Promise<Task> {
+    const response = await fetch(`${getAPIBaseURL()}/tasks/${id}/resume`, {
+      method: 'PUT',
+    })
+    if (!response.ok) throw new Error('Failed to resume task')
+    return response.json()
+  }
+
+  async retryTask(id: string): Promise<Task> {
+    const response = await fetch(`${getAPIBaseURL()}/tasks/${id}/retry`, {
+      method: 'POST',
+    })
+    if (!response.ok) throw new Error('Failed to retry task')
+    return response.json()
   }
 
   // Presets
@@ -131,8 +156,8 @@ class APIClient {
     return response.json()
   }
 
-  async getSystemHistory(): Promise<SystemHistory> {
-    const response = await fetch(`${getAPIBaseURL()}/system/history`)
+  async getSystemHistory(range: string = '1h'): Promise<SystemHistory> {
+    const response = await fetch(`${getAPIBaseURL()}/system/history?range=${encodeURIComponent(range)}`)
     if (!response.ok) throw new Error('Failed to get system history')
     return response.json()
   }
@@ -153,6 +178,24 @@ class APIClient {
     if (!response.ok) throw new Error('Failed to update settings')
     return response.json()
   }
+
+  // Command Preview
+  async previewCommand(config: TranscodeConfig, sourceFile?: string): Promise<string> {
+    const response = await fetch(`${getAPIBaseURL()}/command/preview`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        config,
+        sourceFile: sourceFile || 'input.mp4'
+      }),
+    })
+    if (!response.ok) throw new Error('Failed to preview command')
+    const data = await response.json()
+    return data.command
+  }
 }
 
-export const api = new APIClient()
+// Switch between real and mock API based on environment variable
+const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true'
+export const api = USE_MOCK ? new MockAPIClient() : new APIClient()
+
