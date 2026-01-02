@@ -309,6 +309,15 @@ export const translations = {
       description: 'Description',
       actions: 'Actions',
     },
+    // Pagination
+    pagination: {
+      showing: 'Showing',
+      of: 'of',
+      page: 'Page',
+      perPage: 'Per page',
+      previous: 'Previous',
+      next: 'Next',
+    },
   },
   zh: {
     // 导航
@@ -618,6 +627,15 @@ export const translations = {
       name: '名称',
       description: '描述',
       actions: '操作',
+    },
+    // 分页
+    pagination: {
+      showing: '显示',
+      of: '共',
+      page: '第',
+      perPage: '每页',
+      previous: '上一页',
+      next: '下一页',
     },
   },
 } as const
