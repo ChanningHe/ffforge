@@ -2,6 +2,7 @@ import type { FileInfo, Task, Preset, HardwareInfo, TranscodeConfig, Settings } 
 import type { HostInfo, SystemUsage, SystemHistory } from '@/types/system'
 import type { GPUCapabilities } from '@/types/hardware'
 import { getAPIBase } from './config'
+import { MockAPIClient } from './mockApi'
 
 // Get API base URL dynamically (supports both web and desktop modes)
 const getAPIBaseURL = () => getAPIBase()
@@ -155,4 +156,7 @@ class APIClient {
   }
 }
 
-export const api = new APIClient()
+// Switch between real and mock API based on environment variable
+const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true'
+export const api = USE_MOCK ? new MockAPIClient() : new APIClient()
+
