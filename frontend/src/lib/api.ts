@@ -131,8 +131,8 @@ class APIClient {
     return response.json()
   }
 
-  async getSystemHistory(): Promise<SystemHistory> {
-    const response = await fetch(`${getAPIBaseURL()}/system/history`)
+  async getSystemHistory(range: string = '1h'): Promise<SystemHistory> {
+    const response = await fetch(`${getAPIBaseURL()}/system/history?range=${encodeURIComponent(range)}`)
     if (!response.ok) throw new Error('Failed to get system history')
     return response.json()
   }

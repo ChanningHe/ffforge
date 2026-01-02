@@ -183,3 +183,94 @@ func (s *SystemService) GetHistory() []model.SystemUsage {
 	copy(result, s.history)
 	return result
 }
+
+// GetHistoryWithRange returns historical system usage data filtered by time range with downsampling
+// Supported ranges: 1h, 6h, 12h, 24h
+func (s *SystemService) GetHistoryWithRange(rangeStr string) []model.SystemUsage {
+	s.historyMutex.RLock()
+	defer s.historyMutex.RUnlock()
+
+	if len(s.history) == 0 {
+		return []model.SystemUsage{}
+	}
+
+	// Parse range to duration and sample interval
+	var duration time.Duration
+	var sampleInterval int // in seconds, 1 = no downsampling
+
+	switch rangeStr {
+	case "1h":
+		duration = 1 * time.Hour
+		sampleInterval = 1
+	case "6h":
+		duration = 6 * time.Hour
+		sampleInterval = 10
+	case "12h":
+		duration = 12 * time.Hour
+		sampleInterval = 20
+	case "24h":
+		duration = 24 * time.Hour
+		sampleInterval = 40
+	default:
+		// Default to 1h
+		duration = 1 * time.Hour
+		sampleInterval = 1
+	}
+
+	cutoff := time.Now().Add(-duration)
+
+	// Filter by time range
+	var filtered []model.SystemUsage
+	for _, u := range s.history {
+		if u.Timestamp.After(cutoff) {
+			filtered = append(filtered, u)
+		}
+	}
+
+	if len(filtered) == 0 {
+		return []model.SystemUsage{}
+	}
+
+	// Downsample if needed
+	if sampleInterval <= 1 {
+		return filtered
+	}
+
+	// Downsample by averaging
+	var result []model.SystemUsage
+	for i := 0; i < len(filtered); i += sampleInterval {
+		end := i + sampleInterval
+		if end > len(filtered) {
+			end = len(filtered)
+		}
+
+		// Average the values in this bucket
+		var sumCPU, sumMemPercent, sumLoad1, sumLoad5, sumLoad15 float64
+		var sumMemUsage, sumMemTotal uint64
+		count := float64(end - i)
+
+		for j := i; j < end; j++ {
+			sumCPU += filtered[j].CPUPercent
+			sumMemUsage += filtered[j].MemoryUsage
+			sumMemTotal += filtered[j].MemoryTotal
+			sumMemPercent += filtered[j].MemoryPercent
+			sumLoad1 += filtered[j].Load1
+			sumLoad5 += filtered[j].Load5
+			sumLoad15 += filtered[j].Load15
+		}
+
+		result = append(result, model.SystemUsage{
+			Timestamp:     filtered[i].Timestamp, // Use first timestamp in bucket
+			CPUPercent:    sumCPU / count,
+			MemoryUsage:   sumMemUsage / uint64(count),
+			MemoryTotal:   sumMemTotal / uint64(count),
+			MemoryPercent: sumMemPercent / count,
+			Load1:         sumLoad1 / count,
+			Load5:         sumLoad5 / count,
+			Load15:        sumLoad15 / count,
+		})
+	}
+
+	return result
+}
+

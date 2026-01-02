@@ -12,15 +12,16 @@ interface ResourceMonitorCardProps {
   history: SystemHistory | null
   onRefreshIntervalChange: (interval: number) => void
   refreshInterval: number
+  timeRange: TimeRange
+  onTimeRangeChange: (range: TimeRange) => void
 }
 
 type ResourceType = 'cpu' | 'memory' | 'load'
 type TimeRange = '1h' | '6h' | '12h' | '24h'
 
-export function ResourceMonitorCard({ current, history, onRefreshIntervalChange, refreshInterval }: ResourceMonitorCardProps) {
+export function ResourceMonitorCard({ current, history, onRefreshIntervalChange, refreshInterval, timeRange, onTimeRangeChange }: ResourceMonitorCardProps) {
   const { t } = useApp()
   const [resourceType, setResourceType] = useState<ResourceType>('cpu')
-  const [timeRange, setTimeRange] = useState<TimeRange>('1h')
 
   const chartData = useMemo(() => {
     if (!history?.data) return []
@@ -78,7 +79,7 @@ export function ResourceMonitorCard({ current, history, onRefreshIntervalChange,
       <CardContent>
         {/* Real-time Stats Badges */}
         <div className="grid grid-cols-3 gap-4 mb-6">
-          <div 
+          <div
             className={`p-3 rounded-lg border cursor-pointer transition-colors ${resourceType === 'cpu' ? 'bg-blue-50 border-blue-200 dark:bg-blue-950/20 dark:border-blue-800' : 'bg-muted/30 hover:bg-muted/50'}`}
             onClick={() => setResourceType('cpu')}
           >
@@ -87,8 +88,8 @@ export function ResourceMonitorCard({ current, history, onRefreshIntervalChange,
               {current ? `${current.cpuPercent.toFixed(1)}%` : '-'}
             </div>
           </div>
-          
-          <div 
+
+          <div
             className={`p-3 rounded-lg border cursor-pointer transition-colors ${resourceType === 'memory' ? 'bg-purple-50 border-purple-200 dark:bg-purple-950/20 dark:border-purple-800' : 'bg-muted/30 hover:bg-muted/50'}`}
             onClick={() => setResourceType('memory')}
           >
@@ -98,7 +99,7 @@ export function ResourceMonitorCard({ current, history, onRefreshIntervalChange,
             </div>
           </div>
 
-          <div 
+          <div
             className={`p-3 rounded-lg border cursor-pointer transition-colors ${resourceType === 'load' ? 'bg-amber-50 border-amber-200 dark:bg-amber-950/20 dark:border-amber-800' : 'bg-muted/30 hover:bg-muted/50'}`}
             onClick={() => setResourceType('load')}
           >
@@ -116,7 +117,7 @@ export function ResourceMonitorCard({ current, history, onRefreshIntervalChange,
               key={range}
               variant={timeRange === range ? "default" : "outline"}
               size="sm"
-              onClick={() => setTimeRange(range)}
+              onClick={() => onTimeRangeChange(range)}
               className="h-7 text-xs"
             >
               {range}
@@ -130,36 +131,36 @@ export function ResourceMonitorCard({ current, history, onRefreshIntervalChange,
             <AreaChart data={chartData}>
               <defs>
                 <linearGradient id={`color${resourceType}`} x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor={getStrokeColor(resourceType)} stopOpacity={0.3}/>
-                  <stop offset="95%" stopColor={getStrokeColor(resourceType)} stopOpacity={0}/>
+                  <stop offset="5%" stopColor={getStrokeColor(resourceType)} stopOpacity={0.3} />
+                  <stop offset="95%" stopColor={getStrokeColor(resourceType)} stopOpacity={0} />
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-              <XAxis 
-                dataKey="time" 
-                stroke="#888888" 
-                fontSize={12} 
+              <XAxis
+                dataKey="time"
+                stroke="#888888"
+                fontSize={12}
                 tickLine={false}
                 axisLine={false}
                 minTickGap={30}
               />
-              <YAxis 
-                stroke="#888888" 
-                fontSize={12} 
-                tickLine={false} 
+              <YAxis
+                stroke="#888888"
+                fontSize={12}
+                tickLine={false}
                 axisLine={false}
                 domain={[0, resourceType === 'load' ? 'auto' : 100]}
               />
-              <Tooltip 
+              <Tooltip
                 contentStyle={{ backgroundColor: 'hsl(var(--card))', borderColor: 'hsl(var(--border))', borderRadius: 'var(--radius)' }}
                 itemStyle={{ color: 'hsl(var(--foreground))' }}
               />
-              <Area 
-                type="monotone" 
-                dataKey={resourceType === 'load' ? 'load' : resourceType} 
-                stroke={getStrokeColor(resourceType)} 
-                fillOpacity={1} 
-                fill={`url(#color${resourceType})`} 
+              <Area
+                type="monotone"
+                dataKey={resourceType === 'load' ? 'load' : resourceType}
+                stroke={getStrokeColor(resourceType)}
+                fillOpacity={1}
+                fill={`url(#color${resourceType})`}
                 isAnimationActive={false}
               />
             </AreaChart>
