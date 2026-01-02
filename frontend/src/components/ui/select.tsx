@@ -40,7 +40,7 @@ export function Select({ value, onChange, options, placeholder, className }: Sel
         type="button"
         onClick={() => setIsOpen(!isOpen)}
         className={cn(
-          'w-full h-full flex items-center justify-between px-2 text-xs',
+          'w-full flex items-center justify-between px-2 py-2.5 text-xs',
           'bg-background border rounded-md',
           'hover:bg-accent transition-colors',
           'focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2'

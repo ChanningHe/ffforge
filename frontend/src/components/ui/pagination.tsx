@@ -97,7 +97,7 @@ export function Pagination({
                     value={pageSize.toString()}
                     onChange={(value: string) => onPageSizeChange(Number(value))}
                     options={pageSizeSelectOptions}
-                    className="w-[70px] h-full"
+                    className="w-[70px] h-8 [&>button]:h-full [&>button]:py-0"
                 />
             </div>
         </div>
