@@ -3,6 +3,7 @@ package api
 import (
 	"ffmpeg-web/internal/database"
 	"ffmpeg-web/internal/model"
+	"ffmpeg-web/internal/service"
 	"net/http"
 	"time"
 
@@ -18,22 +19,24 @@ type WorkerPool interface {
 
 // TasksHandler handles task-related API requests
 type TasksHandler struct {
-	db   *database.DB
-	pool WorkerPool
+	db          *database.DB
+	pool        WorkerPool
+	fileService *service.FileService
 }
 
 // NewTasksHandler creates a new tasks handler
-func NewTasksHandler(db *database.DB, pool WorkerPool) *TasksHandler {
+func NewTasksHandler(db *database.DB, pool WorkerPool, fileService *service.FileService) *TasksHandler {
 	return &TasksHandler{
-		db:   db,
-		pool: pool,
+		db:          db,
+		pool:        pool,
+		fileService: fileService,
 	}
 }
 
 // CreateTaskRequest represents a request to create a new task
 type CreateTaskRequest struct {
-	SourceFiles []string              `json:"sourceFiles" binding:"required"`
-	Preset      string                `json:"preset,omitempty"`
+	SourceFiles []string               `json:"sourceFiles" binding:"required"`
+	Preset      string                 `json:"preset,omitempty"`
 	Config      *model.TranscodeConfig `json:"config,omitempty"`
 }
 
@@ -67,9 +70,32 @@ func (h *TasksHandler) CreateTask(c *gin.Context) {
 		return
 	}
 
+	// Expand directories to video files
+	// This allows selecting folders and having all videos within transcoded
+	var allSourceFiles []string
+	for _, path := range req.SourceFiles {
+		if h.fileService.IsDirectory(path) {
+			// Scan directory for video files
+			videoFiles, err := h.fileService.ScanVideoFilesInDirectory(path)
+			if err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "failed to scan directory: " + path})
+				return
+			}
+			allSourceFiles = append(allSourceFiles, videoFiles...)
+		} else {
+			allSourceFiles = append(allSourceFiles, path)
+		}
+	}
+
+	// Check if any files were found
+	if len(allSourceFiles) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "no video files found in selected paths"})
+		return
+	}
+
 	// Create tasks for each source file
-	tasks := make([]*model.Task, 0, len(req.SourceFiles))
-	for _, sourceFile := range req.SourceFiles {
+	tasks := make([]*model.Task, 0, len(allSourceFiles))
+	for _, sourceFile := range allSourceFiles {
 		task := &model.Task{
 			ID:         uuid.New().String(),
 			SourceFile: sourceFile,
@@ -184,7 +210,7 @@ func (h *TasksHandler) CancelTask(c *gin.Context) {
 		task.Status = model.TaskStatusCancelled
 		task.Error = "Task cancelled (not running in worker pool)"
 		task.CompletedAt = &now
-		
+
 		if updateErr := h.db.UpdateTask(task); updateErr != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to cancel task"})
 			return
@@ -193,4 +219,3 @@ func (h *TasksHandler) CancelTask(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"message": "task cancelled"})
 }
-

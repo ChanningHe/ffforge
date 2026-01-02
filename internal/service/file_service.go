@@ -207,3 +207,50 @@ func isVideoFile(filename string) bool {
 
 	return false
 }
+
+// IsDirectory checks if a path is a directory
+func (fs *FileService) IsDirectory(path string) bool {
+	info, err := os.Stat(path)
+	if err != nil {
+		return false
+	}
+	return info.IsDir()
+}
+
+// ScanVideoFilesInDirectory recursively scans a directory for video files
+// Returns absolute paths to all video files found
+func (fs *FileService) ScanVideoFilesInDirectory(dirPath string) ([]string, error) {
+	var videoFiles []string
+
+	// Walk the directory tree
+	err := filepath.Walk(dirPath, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err // Skip files/dirs we can't access
+		}
+
+		// Skip hidden files and directories
+		if strings.HasPrefix(info.Name(), ".") {
+			if info.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+
+		// Add video files to the list
+		if !info.IsDir() && isVideoFile(info.Name()) {
+			absPath, err := filepath.Abs(path)
+			if err != nil {
+				absPath = path
+			}
+			videoFiles = append(videoFiles, absPath)
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to scan directory: %w", err)
+	}
+
+	return videoFiles, nil
+}

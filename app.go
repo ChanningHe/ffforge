@@ -277,7 +277,7 @@ func (a *App) startHTTPServer() error {
 
 	// Initialize API handlers
 	filesHandler := api.NewFilesHandler(fileService, ffmpegService)
-	tasksHandler := api.NewTasksHandler(a.db, a.workerPool)
+	tasksHandler := api.NewTasksHandler(a.db, a.workerPool, fileService)
 	presetsHandler := api.NewPresetsHandler(a.db)
 	hardwareHandler := api.NewHardwareHandler(hardwareService)
 	settingsHandler := api.NewSettingsHandler(a.db.Conn())

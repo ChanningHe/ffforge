@@ -56,7 +56,7 @@ func main() {
 
 	// Initialize API handlers
 	filesHandler := api.NewFilesHandler(fileService, ffmpegService)
-	tasksHandler := api.NewTasksHandler(db, workerPool)
+	tasksHandler := api.NewTasksHandler(db, workerPool, fileService)
 	presetsHandler := api.NewPresetsHandler(db)
 	hardwareHandler := api.NewHardwareHandler(hardwareService)
 	settingsHandler := api.NewSettingsHandler(db.Conn())
@@ -122,7 +122,7 @@ func main() {
 		router.Static("/assets", "./web/assets")
 		router.StaticFile("/logo.png", "./web/logo.png")
 		router.StaticFile("/logo.svg", "./web/logo.svg")
-		
+
 		// Serve index.html for root and handle SPA routing
 		router.StaticFile("/", "./web/index.html")
 		router.NoRoute(func(c *gin.Context) {
