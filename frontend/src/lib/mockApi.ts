@@ -139,6 +139,28 @@ class MockAPIClient {
         )
     }
 
+    async retryTask(id: string): Promise<Task> {
+        await delay(200)
+        const originalTask = tasks.find(t => t.id === id)
+        if (!originalTask) throw new Error('Task not found')
+
+        const newTask: Task = {
+            id: `task-mock-${++taskIdCounter}`,
+            sourceFile: originalTask.sourceFile,
+            outputFile: '',
+            status: 'pending' as const,
+            progress: 0,
+            speed: 0,
+            eta: 0,
+            createdAt: new Date().toISOString(),
+            sourceFileSize: originalTask.sourceFileSize,
+            config: originalTask.config,
+        }
+
+        tasks = [...tasks, newTask]
+        return newTask
+    }
+
     // Presets
     async getPresets(): Promise<Preset[]> {
         await delay()

@@ -219,3 +219,48 @@ func (h *TasksHandler) CancelTask(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"message": "task cancelled"})
 }
+
+// RetryTask handles POST /api/tasks/:id/retry
+// Creates a new task based on an existing failed, cancelled, or completed task
+func (h *TasksHandler) RetryTask(c *gin.Context) {
+	id := c.Param("id")
+
+	// Get original task
+	originalTask, err := h.db.GetTask(id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "task not found"})
+		return
+	}
+
+	// Can only retry completed, failed, or cancelled tasks
+	if originalTask.Status != model.TaskStatusCompleted &&
+		originalTask.Status != model.TaskStatusFailed &&
+		originalTask.Status != model.TaskStatusCancelled {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "can only retry completed, failed, or cancelled tasks"})
+		return
+	}
+
+	// Create a new task with the same source file and config
+	newTask := &model.Task{
+		ID:         uuid.New().String(),
+		SourceFile: originalTask.SourceFile,
+		OutputFile: "", // Will be set by worker
+		Status:     model.TaskStatusPending,
+		Progress:   0,
+		Speed:      0,
+		ETA:        0,
+		CreatedAt:  time.Now(),
+		Preset:     originalTask.Preset,
+		Config:     originalTask.Config,
+	}
+
+	if err := h.db.CreateTask(newTask); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create task"})
+		return
+	}
+
+	// Submit task to worker pool
+	h.pool.SubmitTask(newTask.ID)
+
+	c.JSON(http.StatusOK, newTask)
+}

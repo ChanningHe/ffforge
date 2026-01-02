@@ -90,6 +90,7 @@ func main() {
 		apiGroup.PUT("/tasks/:id/pause", tasksHandler.PauseTask)
 		apiGroup.PUT("/tasks/:id/resume", tasksHandler.ResumeTask)
 		apiGroup.PUT("/tasks/:id/cancel", tasksHandler.CancelTask)
+		apiGroup.POST("/tasks/:id/retry", tasksHandler.RetryTask)
 		apiGroup.DELETE("/tasks/:id", tasksHandler.DeleteTask)
 
 		// Presets

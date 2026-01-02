@@ -222,6 +222,12 @@ export const translations = {
       sourceFileSize: 'Source Size',
       outputFileSize: 'Output Size',
       compressionRatio: 'Compression Ratio',
+      retry: 'Retry',
+      retryTask: 'Retry Task',
+      retrySuccess: 'Task retry submitted successfully',
+      retryFailed: 'Failed to retry task',
+      retrySelected: 'Retry Selected',
+      retryMultipleSuccess: 'Selected tasks retry submitted successfully',
     },
     // Settings page
     settings: {
@@ -541,6 +547,12 @@ export const translations = {
       sourceFileSize: '源文件大小',
       outputFileSize: '输出文件大小',
       compressionRatio: '压缩比',
+      retry: '重试',
+      retryTask: '重试任务',
+      retrySuccess: '任务重试已提交',
+      retryFailed: '重试任务失败',
+      retrySelected: '重试选中',
+      retryMultipleSuccess: '选中任务重试已提交',
     },
     // 设置页面
     settings: {

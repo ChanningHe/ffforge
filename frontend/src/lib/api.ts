@@ -66,6 +66,14 @@ class APIClient {
     if (!response.ok) throw new Error('Failed to cancel task')
   }
 
+  async retryTask(id: string): Promise<Task> {
+    const response = await fetch(`${getAPIBaseURL()}/tasks/${id}/retry`, {
+      method: 'POST',
+    })
+    if (!response.ok) throw new Error('Failed to retry task')
+    return response.json()
+  }
+
   // Presets
   async getPresets(): Promise<Preset[]> {
     const response = await fetch(`${getAPIBaseURL()}/presets`)

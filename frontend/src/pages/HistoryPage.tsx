@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Trash2, CheckCircle2, XCircle, CheckSquare, Square, Terminal } from 'lucide-react'
+import { Trash2, CheckCircle2, XCircle, CheckSquare, Square, Terminal, RotateCcw } from 'lucide-react'
 import { api } from '@/lib/api'
 import { useApp } from '@/contexts/AppContext'
 import { Button } from '@/components/ui/button'
@@ -73,6 +73,31 @@ export default function HistoryPage() {
     },
     onError: () => {
       showToast(t.history.deleteFailed, 'error')
+    },
+  })
+
+  const retryMutation = useMutation({
+    mutationFn: (id: string) => api.retryTask(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tasks'] })
+      showToast(t.history.retrySuccess, 'success')
+    },
+    onError: () => {
+      showToast(t.history.retryFailed, 'error')
+    },
+  })
+
+  const retryMultipleMutation = useMutation({
+    mutationFn: async (ids: string[]) => {
+      await Promise.all(ids.map(id => api.retryTask(id)))
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tasks'] })
+      showToast(t.history.retryMultipleSuccess, 'success')
+      setSelectedTasks([])
+    },
+    onError: () => {
+      showToast(t.history.retryFailed, 'error')
     },
   })
 
@@ -152,14 +177,25 @@ export default function HistoryPage() {
         </div>
         <div className="flex gap-2">
           {selectedTasks.length > 0 && (
-            <Button
-              variant="destructive"
-              size="sm"
-              onClick={handleDeleteSelected}
-            >
-              <Trash2 className="h-4 w-4 mr-1" />
-              {t.history.deleteSelected} ({selectedTasks.length})
-            </Button>
+            <>
+              <Button
+                variant="default"
+                size="sm"
+                onClick={() => retryMultipleMutation.mutate(selectedTasks)}
+                disabled={retryMultipleMutation.isPending}
+              >
+                <RotateCcw className={cn("h-4 w-4 mr-1", retryMultipleMutation.isPending && "animate-spin")} />
+                {t.history.retrySelected} ({selectedTasks.length})
+              </Button>
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={handleDeleteSelected}
+              >
+                <Trash2 className="h-4 w-4 mr-1" />
+                {t.history.deleteSelected} ({selectedTasks.length})
+              </Button>
+            </>
           )}
           {completedTasks.length > 0 && (
             <Button
@@ -474,6 +510,16 @@ export default function HistoryPage() {
 
                 {/* Actions */}
                 <div className="pt-3 border-t space-y-2">
+                  <Button
+                    variant="default"
+                    size="sm"
+                    onClick={() => retryMutation.mutate(selectedTask.id)}
+                    disabled={retryMutation.isPending}
+                    className="w-full"
+                  >
+                    <RotateCcw className={cn("h-4 w-4 mr-1", retryMutation.isPending && "animate-spin")} />
+                    {t.history.retryTask}
+                  </Button>
                   <Button
                     variant="outline"
                     size="sm"
