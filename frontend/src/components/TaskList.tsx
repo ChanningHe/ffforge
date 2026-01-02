@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { X, CheckSquare, Square, Terminal } from 'lucide-react'
 import { api } from '@/lib/api'
@@ -10,8 +10,8 @@ import { Badge } from '@/components/ui/badge'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { Pagination } from '@/components/ui/pagination'
 import { useToast } from '@/components/ui/toast'
+import { TaskItem } from '@/components/TaskItem'
 import { formatSpeed, formatDuration, generateFFmpegCommand } from '@/lib/utils'
-import { cn } from '@/lib/utils'
 import type { Task, TaskStatus, ProgressUpdate } from '@/types'
 
 const getStatusVariant = (status: TaskStatus): "default" | "secondary" | "destructive" | "outline" => {
@@ -128,13 +128,16 @@ export default function TaskList() {
     }
   }
 
-  const toggleTaskSelection = (taskId: string) => {
-    if (selectedTasks.includes(taskId)) {
-      setSelectedTasks(selectedTasks.filter(id => id !== taskId))
-    } else {
-      setSelectedTasks([...selectedTasks, taskId])
-    }
-  }
+  // ! PERF: 使用 useCallback + 函数式更新，确保引用稳定
+  const toggleTaskSelection = useCallback((taskId: string) => {
+    setSelectedTasks(prev => {
+      if (prev.includes(taskId)) {
+        return prev.filter(id => id !== taskId)
+      } else {
+        return [...prev, taskId]
+      }
+    })
+  }, [])
 
   const selectAllTasks = () => {
     if (selectedTasks.length === activeTasks.length) {
@@ -240,78 +243,18 @@ export default function TaskList() {
                     </p>
                   ) : (
                     <div className="space-y-2">
-                      {paginatedTasks.map((task) => {
-                        const isSelected = selectedTasks.includes(task.id)
-                        const isActive = selectedTask?.id === task.id
-
-                        return (
-                          <div
-                            key={task.id}
-                            className={cn(
-                              "p-3 rounded-md transition-colors cursor-pointer",
-                              "hover:bg-accent",
-                              isActive && "bg-accent",
-                              isSelected && "bg-primary/5 border-l-2 border-primary"
-                            )}
-                            onClick={() => setSelectedTask(task)}
-                          >
-                            <div className="flex items-start gap-3">
-                              {/* Checkbox */}
-                              <div
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  toggleTaskSelection(task.id)
-                                }}
-                                className="flex-shrink-0 pt-1"
-                              >
-                                {isSelected ? (
-                                  <CheckSquare className="h-4 w-4 text-primary" />
-                                ) : (
-                                  <Square className="h-4 w-4 text-muted-foreground" />
-                                )}
-                              </div>
-
-                              {/* Task info */}
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-start justify-between gap-2 mb-1">
-                                  <p className="font-medium text-sm truncate" title={task.sourceFile}>
-                                    {task.sourceFile.split('/').pop() || task.sourceFile}
-                                  </p>
-                                  <Badge variant={getStatusVariant(task.status)} className="flex-shrink-0">
-                                    {t.tasks.status[task.status]}
-                                  </Badge>
-                                </div>
-
-                                {task.status === 'running' && (
-                                  <div className="space-y-1">
-                                    <Progress value={task.progress} className="h-1" />
-                                    <div className="flex items-center justify-between text-xs text-muted-foreground">
-                                      <span>{task.progress.toFixed(1)}%</span>
-                                      {task.speed > 0 && (
-                                        <span className="flex items-center gap-2">
-                                          <span>{formatSpeed(task.speed)}</span>
-                                          {task.eta > 0 && (
-                                            <span>· {formatDuration(task.eta)}</span>
-                                          )}
-                                        </span>
-                                      )}
-                                    </div>
-                                  </div>
-                                )}
-
-                                {task.status === 'pending' && (
-                                  <div className="space-y-1">
-                                    <Progress value={0} className="h-1" />
-                                    <p className="text-xs text-muted-foreground">
-                                      {t.tasks.status.pending}
-                                    </p>
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        )
-                      })}
+                      {paginatedTasks.map((task) => (
+                        <TaskItem
+                          key={task.id}
+                          task={task}
+                          isSelected={selectedTasks.includes(task.id)}
+                          isActive={selectedTask?.id === task.id}
+                          statusLabel={t.tasks.status[task.status]}
+                          pendingLabel={t.tasks.status.pending}
+                          onSelect={setSelectedTask}
+                          onToggleSelection={toggleTaskSelection}
+                        />
+                      ))}
                     </div>
                   )}
                 </div>
