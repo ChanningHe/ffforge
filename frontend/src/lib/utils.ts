@@ -6,27 +6,77 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
+/**
+ * Helper to compute the output file path based on config and pathType.
+ * Mirrors backend GenerateOutputPath logic for accurate preview.
+ */
+function computeOutputFilePath(
+  inputFile: string,
+  output: TranscodeConfig['output'],
+  defaultOutputPath?: string
+): string {
+  const dirPath = inputFile.substring(0, inputFile.lastIndexOf('/'))
+  const dirName = dirPath.substring(dirPath.lastIndexOf('/') + 1)
+
+  // Handle overwrite mode - return source file path directly
+  if (output.pathType === 'overwrite') {
+    return inputFile
+  }
+
+  // Add suffix
+  const suffix = output.suffix || '_transcoded'
+  // Determine output extension
+  const outputExt = output.container ? `.${output.container}` : '.mp4'
+  const outputFilename = inputFile.substring(inputFile.lastIndexOf('/') + 1).replace(/\.[^/.]+$/, '') + suffix + outputExt
+
+  // Determine output directory based on PathType
+  let outputDir: string
+  switch (output.pathType) {
+    case 'source':
+      // Output to source file directory
+      outputDir = dirPath
+      break
+    case 'custom':
+      // Output to custom path
+      outputDir = output.customPath || defaultOutputPath || '/output'
+      break
+    case 'default':
+    default:
+      // Output to default output directory with source folder name
+      // This mirrors backend: outputDir = filepath.Join(fs.outputPath, filepath.Base(dir))
+      outputDir = defaultOutputPath
+        ? `${defaultOutputPath}/${dirName}`
+        : `/output/${dirName}`
+      break
+  }
+
+  return `${outputDir}/${outputFilename}`
+}
+
 // Generate FFmpeg command preview based on config
-export function generateFFmpegCommand(config: TranscodeConfig, inputFile: string = 'input.mp4'): string {
+export function generateFFmpegCommand(
+  config: TranscodeConfig,
+  inputFile: string = 'input.mp4',
+  defaultOutputPath?: string
+): string {
   const parts: string[] = ['ffmpeg']
-  
+
   // Check if using advanced mode
   if (config.mode === 'advanced' && config.customCommand) {
     // Advanced mode: use custom command with [[INPUT]] and [[OUTPUT]] placeholders
     let customCmd = config.customCommand.trim()
-    const { output } = config
-    const outputFile = inputFile.replace(/\.[^/.]+$/, '') + output.suffix + '.' + output.container
-    
+    const outputFile = computeOutputFilePath(inputFile, config.output, defaultOutputPath)
+
     // Replace placeholders for preview
     customCmd = customCmd.replace(/\[\[INPUT\]\]/g, inputFile)
     customCmd = customCmd.replace(/\[\[OUTPUT\]\]/g, outputFile)
-    
+
     parts.push(customCmd)
     return parts.join(' ')
   } else {
     // Simple mode: build command from UI config
     const { encoder, hardwareAccel, video, audio } = config
-    
+
     // IMPORTANT: Hardware acceleration flags must come BEFORE -i input file
     if (hardwareAccel === 'nvidia') {
       parts.push('-hwaccel', 'cuda', '-hwaccel_output_format', 'cuda')
@@ -35,10 +85,10 @@ export function generateFFmpegCommand(config: TranscodeConfig, inputFile: string
     } else if (hardwareAccel === 'amd') {
       // AMD AMF typically doesn't need input hardware acceleration
     }
-    
+
     // Add input file
     parts.push('-i', inputFile)
-    
+
     // Video codec
     let videoCodec: string
     if (hardwareAccel === 'nvidia') {
@@ -51,7 +101,7 @@ export function generateFFmpegCommand(config: TranscodeConfig, inputFile: string
       videoCodec = encoder === 'h265' ? 'libx265' : 'libsvtav1'
     }
     parts.push('-c:v', videoCodec)
-    
+
     // Encoding preset
     if (video.preset) {
       if (hardwareAccel === 'amd') {
@@ -60,7 +110,7 @@ export function generateFFmpegCommand(config: TranscodeConfig, inputFile: string
         parts.push('-preset', video.preset)
       }
     }
-    
+
     // CRF/Quality
     if (video.crf !== undefined) {
       if (hardwareAccel === 'nvidia') {
@@ -73,7 +123,7 @@ export function generateFFmpegCommand(config: TranscodeConfig, inputFile: string
         parts.push('-crf', video.crf.toString())
       }
     }
-    
+
     // Audio encoding
     if (audio.codec === 'copy') {
       parts.push('-c:a', 'copy')
@@ -86,20 +136,19 @@ export function generateFFmpegCommand(config: TranscodeConfig, inputFile: string
         parts.push('-ac', audio.channels.toString())
       }
     }
-    
+
     // Extra parameters
     if (config.extraParams && config.extraParams.trim()) {
       parts.push(config.extraParams.trim())
     }
   }
-  
+
   // Output file (only for simple mode, already handled in advanced mode)
   if (config.mode !== 'advanced') {
-    const { output } = config
-    const outputFile = inputFile.replace(/\.[^/.]+$/, '') + output.suffix + '.' + output.container
+    const outputFile = computeOutputFilePath(inputFile, config.output, defaultOutputPath)
     parts.push(outputFile)
   }
-  
+
   return parts.join(' ')
 }
 
