@@ -139,6 +139,30 @@ class MockAPIClient {
         )
     }
 
+    async pauseTask(id: string): Promise<Task> {
+        await delay()
+        tasks = tasks.map(t =>
+            t.id === id && t.status === 'pending'
+                ? { ...t, status: 'paused' as const }
+                : t
+        )
+        const task = tasks.find(t => t.id === id)
+        if (!task) throw new Error('Task not found')
+        return task
+    }
+
+    async resumeTask(id: string): Promise<Task> {
+        await delay()
+        tasks = tasks.map(t =>
+            t.id === id && t.status === 'paused'
+                ? { ...t, status: 'pending' as const }
+                : t
+        )
+        const task = tasks.find(t => t.id === id)
+        if (!task) throw new Error('Task not found')
+        return task
+    }
+
     async retryTask(id: string): Promise<Task> {
         await delay(200)
         const originalTask = tasks.find(t => t.id === id)

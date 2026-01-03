@@ -102,6 +102,36 @@ export default function TaskList() {
     },
   })
 
+  const pauseMutation = useMutation({
+    mutationFn: (id: string) => api.pauseTask(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tasks'] })
+      showToast(t.tasks.taskPaused, 'success')
+    },
+    onError: () => {
+      showToast(t.tasks.pauseFailed, 'error')
+    },
+  })
+
+  const resumeMutation = useMutation({
+    mutationFn: (id: string) => api.resumeTask(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tasks'] })
+      showToast(t.tasks.taskResumed, 'success')
+    },
+    onError: () => {
+      showToast(t.tasks.resumeFailed, 'error')
+    },
+  })
+
+  const handlePause = (id: string) => {
+    pauseMutation.mutate(id)
+  }
+
+  const handleResume = (id: string) => {
+    resumeMutation.mutate(id)
+  }
+
   const handleCancel = (id: string) => {
     setTaskToCancel(id)
     setCancelConfirmOpen(true)
@@ -147,18 +177,22 @@ export default function TaskList() {
     }
   }
 
-  // Only show active tasks (pending and running)
-  // Sort: running tasks first, then by createdAt descending (newest first)
-  const activeTasks = (tasks?.filter(t => t.status === 'running' || t.status === 'pending') || [])
+  // Only show active tasks (pending, paused, and running)
+  // Sort: running tasks first, then pending, then paused, finally by createdAt descending (newest first)
+  const activeTasks = (tasks?.filter(t => t.status === 'running' || t.status === 'pending' || t.status === 'paused') || [])
     .sort((a, b) => {
       // Running tasks come first
       if (a.status === 'running' && b.status !== 'running') return -1
       if (b.status === 'running' && a.status !== 'running') return 1
+      // Then pending tasks
+      if (a.status === 'pending' && b.status === 'paused') return -1
+      if (b.status === 'pending' && a.status === 'paused') return 1
       // Then sort by createdAt descending (newest first)
       return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
     })
   const runningTasks = activeTasks.filter(t => t.status === 'running')
   const pendingTasks = activeTasks.filter(t => t.status === 'pending')
+  const pausedTasks = activeTasks.filter(t => t.status === 'paused')
 
   // Pagination
   const totalItems = activeTasks.length
@@ -183,6 +217,12 @@ export default function TaskList() {
             <div className="h-3 w-3 rounded-full bg-muted"></div>
             <span className="text-sm">{t.tasks.pendingCount}: {pendingTasks.length}</span>
           </div>
+          {pausedTasks.length > 0 && (
+            <div className="flex items-center gap-2">
+              <div className="h-3 w-3 rounded-full bg-yellow-500"></div>
+              <span className="text-sm">{t.tasks.pausedCount}: {pausedTasks.length}</span>
+            </div>
+          )}
         </div>
         <div className="flex gap-2">
           {selectedTasks.length > 0 && (
@@ -407,6 +447,26 @@ export default function TaskList() {
 
                 {/* Actions */}
                 <div className="pt-3 border-t space-y-2">
+                  {selectedTask.status === 'pending' && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handlePause(selectedTask.id)}
+                      className="w-full"
+                    >
+                      {t.tasks.pause}
+                    </Button>
+                  )}
+                  {selectedTask.status === 'paused' && (
+                    <Button
+                      variant="default"
+                      size="sm"
+                      onClick={() => handleResume(selectedTask.id)}
+                      className="w-full"
+                    >
+                      {t.tasks.resume}
+                    </Button>
+                  )}
                   {selectedTask.status === 'running' && (
                     <Button
                       variant="destructive"

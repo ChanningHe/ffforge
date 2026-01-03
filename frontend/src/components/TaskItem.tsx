@@ -28,6 +28,8 @@ const getStatusVariant = (status: TaskStatus): "default" | "secondary" | "destru
         case 'failed':
         case 'cancelled':
             return 'destructive'
+        case 'paused':
+            return 'outline' // Paused uses outline for distinction
         default:
             return 'outline'
     }
@@ -96,7 +98,7 @@ export const TaskItem = React.memo(function TaskItem({
                         </div>
                     )}
 
-                    {task.status === 'pending' && (
+                    {(task.status === 'pending' || task.status === 'paused') && (
                         <div className="space-y-1">
                             <Progress value={0} className="h-1" />
                             <p className="text-xs text-muted-foreground">

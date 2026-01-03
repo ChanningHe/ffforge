@@ -173,15 +173,58 @@ func (h *TasksHandler) DeleteTask(c *gin.Context) {
 }
 
 // PauseTask handles PUT /api/tasks/:id/pause
+// Only pending tasks (not yet started) can be paused
 func (h *TasksHandler) PauseTask(c *gin.Context) {
-	// Placeholder - will be implemented with worker pool
-	c.JSON(http.StatusNotImplemented, gin.H{"error": "pause not yet implemented"})
+	id := c.Param("id")
+
+	task, err := h.db.GetTask(id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "task not found"})
+		return
+	}
+
+	// Can only pause pending tasks (not yet started)
+	if task.Status != model.TaskStatusPending {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "only pending tasks can be paused"})
+		return
+	}
+
+	task.Status = model.TaskStatusPaused
+	if err := h.db.UpdateTask(task); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to pause task"})
+		return
+	}
+
+	c.JSON(http.StatusOK, task)
 }
 
 // ResumeTask handles PUT /api/tasks/:id/resume
+// Only paused tasks can be resumed
 func (h *TasksHandler) ResumeTask(c *gin.Context) {
-	// Placeholder - will be implemented with worker pool
-	c.JSON(http.StatusNotImplemented, gin.H{"error": "resume not yet implemented"})
+	id := c.Param("id")
+
+	task, err := h.db.GetTask(id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "task not found"})
+		return
+	}
+
+	// Can only resume paused tasks
+	if task.Status != model.TaskStatusPaused {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "only paused tasks can be resumed"})
+		return
+	}
+
+	task.Status = model.TaskStatusPending
+	if err := h.db.UpdateTask(task); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to resume task"})
+		return
+	}
+
+	// Re-submit task to worker pool
+	h.pool.SubmitTask(task.ID)
+
+	c.JSON(http.StatusOK, task)
 }
 
 // CancelTask handles PUT /api/tasks/:id/cancel

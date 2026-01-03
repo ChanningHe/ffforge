@@ -151,6 +151,7 @@ export const translations = {
       status: {
         title: 'Status',
         pending: 'Pending',
+        paused: 'Paused',
         running: 'Running',
         completed: 'Completed',
         failed: 'Failed',
@@ -192,6 +193,15 @@ export const translations = {
       tasksCancelled: 'Tasks cancelled successfully',
       cancelFailed: 'Cancel failed',
       createTaskFailed: 'Failed to create task',
+      pause: 'Pause',
+      resume: 'Resume',
+      pauseTask: 'Pause Task',
+      resumeTask: 'Resume Task',
+      taskPaused: 'Task paused',
+      taskResumed: 'Task resumed',
+      pauseFailed: 'Pause failed',
+      resumeFailed: 'Resume failed',
+      pausedCount: 'Paused',
     },
     // History page
     history: {
@@ -476,6 +486,7 @@ export const translations = {
       status: {
         title: '状态',
         pending: '等待中',
+        paused: '已暂停',
         running: '转码中',
         completed: '已完成',
         failed: '失败',
@@ -517,6 +528,15 @@ export const translations = {
       tasksCancelled: '任务取消成功',
       cancelFailed: '取消失败',
       createTaskFailed: '创建任务失败',
+      pause: '暂停',
+      resume: '恢复',
+      pauseTask: '暂停任务',
+      resumeTask: '恢复任务',
+      taskPaused: '任务已暂停',
+      taskResumed: '任务已恢复',
+      pauseFailed: '暂停失败',
+      resumeFailed: '恢复失败',
+      pausedCount: '已暂停',
     },
     // 历史页面
     history: {

@@ -66,6 +66,22 @@ class APIClient {
     if (!response.ok) throw new Error('Failed to cancel task')
   }
 
+  async pauseTask(id: string): Promise<Task> {
+    const response = await fetch(`${getAPIBaseURL()}/tasks/${id}/pause`, {
+      method: 'PUT',
+    })
+    if (!response.ok) throw new Error('Failed to pause task')
+    return response.json()
+  }
+
+  async resumeTask(id: string): Promise<Task> {
+    const response = await fetch(`${getAPIBaseURL()}/tasks/${id}/resume`, {
+      method: 'PUT',
+    })
+    if (!response.ok) throw new Error('Failed to resume task')
+    return response.json()
+  }
+
   async retryTask(id: string): Promise<Task> {
     const response = await fetch(`${getAPIBaseURL()}/tasks/${id}/retry`, {
       method: 'POST',
