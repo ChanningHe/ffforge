@@ -124,6 +124,29 @@ export function generateFFmpegCommand(
       }
     }
 
+    // HDR handling (only "keep" mode is supported)
+    if (video.hdrMode && video.hdrMode.length > 0 && video.hdrMode.includes('keep')) {
+      // Preserve HDR: requires 10-bit pixel format and HDR metadata parameters
+      // Note: This is for preview only. Backend will check if source is actually HDR.
+      parts.push('-pix_fmt', 'yuv420p10le')
+
+      // Add HDR metadata based on encoder type
+      if (hardwareAccel === 'cpu') {
+        if (encoder === 'h265') {
+          parts.push('-profile:v', 'main10')
+          parts.push('-x265-params', 'hdr-opt=1:repeat-headers=1:colorprim=bt2020:transfer=smpte2084:colormatrix=bt2020nc')
+        } else if (encoder === 'av1') {
+          parts.push('-svtav1-params', 'color-primaries=9:transfer-characteristics=16:matrix-coefficients=9')
+        }
+      } else {
+        // Hardware encoders: NVIDIA, Intel, AMD
+        parts.push('-profile:v', 'main10')
+        parts.push('-color_primaries', 'bt2020')
+        parts.push('-color_trc', 'smpte2084')
+        parts.push('-colorspace', 'bt2020nc')
+      }
+    }
+
     // Audio encoding
     if (audio.codec === 'copy') {
       parts.push('-c:a', 'copy')

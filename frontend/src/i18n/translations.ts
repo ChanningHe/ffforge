@@ -131,6 +131,18 @@ export const translations = {
       extraParams: 'Extra FFmpeg Parameters',
       extraParamsHint: 'Advanced FFmpeg parameters (e.g., -svtav1-params "keyint=12s:scd=1")',
       ffmpegCommand: 'FFmpeg Command Preview',
+      hdrMode: 'HDR Handling',
+      hdrModeHint: 'Control HDR/SDR handling behavior',
+      hdrModeOptions: {
+        passthrough: 'Passthrough',
+        keep: 'Keep',
+        discard: 'Discard',
+      },
+      hdrModeDesc: {
+        passthrough: 'No processing',
+        keep: 'Preserve HDR/SDR as-is',
+        discard: 'Convert HDR to SDR',
+      },
       speeds: {
         ultrafast: 'Ultra Fast',
         superfast: 'Super Fast',
@@ -466,6 +478,18 @@ export const translations = {
       extraParams: '额外 FFmpeg 参数',
       extraParamsHint: '高级 FFmpeg 参数（如：-svtav1-params "keyint=12s:scd=1"）',
       ffmpegCommand: 'FFmpeg 命令预览',
+      hdrMode: 'HDR处理',
+      hdrModeHint: '控制HDR/SDR处理方式',
+      hdrModeOptions: {
+        passthrough: '不处理',
+        keep: '保持',
+        discard: '丢弃',
+      },
+      hdrModeDesc: {
+        passthrough: '不做任何处理',
+        keep: '保持HDR/SDR原样',
+        discard: '将HDR转为SDR',
+      },
       speeds: {
         ultrafast: '极快',
         superfast: '超快',

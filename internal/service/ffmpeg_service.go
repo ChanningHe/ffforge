@@ -35,7 +35,8 @@ func (fs *FFmpegService) ProbeFile(filePath string) (*ffprobe.VideoInfo, error) 
 }
 
 // BuildCommand builds an FFmpeg command based on configuration
-func (fs *FFmpegService) BuildCommand(ctx context.Context, sourceFile, outputFile string, config *model.TranscodeConfig) *exec.Cmd {
+// sourceVideoInfo contains metadata about the source file, used for dynamic HDR handling
+func (fs *FFmpegService) BuildCommand(ctx context.Context, sourceFile, outputFile string, config *model.TranscodeConfig, sourceVideoInfo *ffprobe.VideoInfo) *exec.Cmd {
 	args := []string{}
 
 	// Check if using advanced mode (custom CLI)
@@ -71,8 +72,11 @@ func (fs *FFmpegService) BuildCommand(ctx context.Context, sourceFile, outputFil
 		args = append(args, "-i", sourceFile)
 		args = append(args, "-y") // Overwrite output file
 
-		// Add video encoding args
-		args = append(args, fs.buildVideoArgs(config)...)
+		// Determine if source is HDR
+		sourceIsHDR := sourceVideoInfo != nil && sourceVideoInfo.IsHDR
+
+		// Add video encoding args (with HDR handling)
+		args = append(args, fs.buildVideoArgs(config, sourceIsHDR)...)
 
 		// Add audio encoding args
 		args = append(args, fs.buildAudioArgs(&config.Audio)...)
@@ -152,7 +156,9 @@ func (fs *FFmpegService) buildHardwareAccelArgs(hwAccel string) []string {
 //   - NVIDIA NVENC: uses -preset with values: p1-p7, or quality presets (slow, medium, fast)
 //   - Intel QSV: uses -preset with standard values (slow, medium, fast, etc.)
 //   - AMD AMF: uses -quality with values: quality, balanced, speed
-func (fs *FFmpegService) buildVideoArgs(config *model.TranscodeConfig) []string {
+//
+// sourceIsHDR indicates whether the source video is HDR, used for dynamic HDR handling
+func (fs *FFmpegService) buildVideoArgs(config *model.TranscodeConfig, sourceIsHDR bool) []string {
 	args := []string{}
 
 	// Select codec based on encoder and hardware acceleration
@@ -225,6 +231,30 @@ func (fs *FFmpegService) buildVideoArgs(config *model.TranscodeConfig) []string 
 	// Bitrate (if specified)
 	if config.Video.Bitrate != "" {
 		args = append(args, "-b:v", config.Video.Bitrate)
+	}
+
+	// HDR handling based on source video and user preference
+	// Only "keep" mode is supported (preserve HDR metadata when source is HDR)
+	if len(config.Video.HdrMode) > 0 && config.Video.HdrMode[0] == "keep" && sourceIsHDR {
+		// HDR -> HDR: preserve HDR metadata
+		args = append(args, "-pix_fmt", "yuv420p10le")
+
+		// Add encoder-specific HDR parameters
+		switch config.HardwareAccel {
+		case "cpu":
+			if config.Encoder == "h265" || config.Encoder == "hevc" {
+				args = append(args, "-profile:v", "main10")
+				args = append(args, "-x265-params", "hdr-opt=1:repeat-headers=1:colorprim=bt2020:transfer=smpte2084:colormatrix=bt2020nc")
+			} else if config.Encoder == "av1" {
+				args = append(args, "-svtav1-params", "color-primaries=9:transfer-characteristics=16:matrix-coefficients=9")
+			}
+		case "nvidia", "intel", "amd":
+			// Hardware encoders: use profile main10 and color metadata
+			args = append(args, "-profile:v", "main10")
+			args = append(args, "-color_primaries", "bt2020")
+			args = append(args, "-color_trc", "smpte2084")
+			args = append(args, "-colorspace", "bt2020nc")
+		}
 	}
 
 	return args

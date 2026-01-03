@@ -33,6 +33,7 @@ type Task struct {
 	CompletedAt    *time.Time      `json:"completedAt,omitempty"`
 	Preset         string          `json:"preset,omitempty"`
 	Config         TranscodeConfig `json:"config"`
+	ActualCommand  string          `json:"actualCommand,omitempty"` // Actual FFmpeg command executed (for debugging)
 }
 
 // TranscodeConfig represents the configuration for a transcode task
@@ -54,11 +55,12 @@ type TranscodeConfig struct {
 
 // VideoConfig represents video encoding configuration
 type VideoConfig struct {
-	CRF        int    `json:"crf,omitempty"`
-	Preset     string `json:"preset,omitempty"`
-	Resolution string `json:"resolution,omitempty"` // "original", "1920x1080", etc
-	FPS        string `json:"fps,omitempty"`        // "original", "30", "60", etc
-	Bitrate    string `json:"bitrate,omitempty"`
+	CRF        int      `json:"crf,omitempty"`
+	Preset     string   `json:"preset,omitempty"`
+	Resolution string   `json:"resolution,omitempty"` // "original", "1920x1080", etc
+	FPS        string   `json:"fps,omitempty"`        // "original", "30", "60", etc
+	Bitrate    string   `json:"bitrate,omitempty"`
+	HdrMode    []string `json:"hdrMode,omitempty"` // HDR handling: ["keep"] or empty (passthrough)
 }
 
 // AudioConfig represents audio encoding configuration
