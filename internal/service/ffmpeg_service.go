@@ -72,20 +72,57 @@ func (fs *FFmpegService) BuildCommand(ctx context.Context, sourceFile, outputFil
 		args = append(args, "-i", sourceFile)
 		args = append(args, "-y") // Overwrite output file
 
+		// Map all streams by default to preserve multiple audio tracks, subtitles, attachments
+		args = append(args, "-map", "0")
+
+		// Preserve metadata from source
+		args = append(args, "-map_metadata", "0")
+
 		// Determine if source is HDR
 		sourceIsHDR := sourceVideoInfo != nil && sourceVideoInfo.IsHDR
 
+		if sourceIsHDR {
+			fmt.Printf("[BuildCommand] Detected HDR source: %s, ColorSpace: %s, Transfer: %s\n",
+				sourceFile, sourceVideoInfo.ColorSpace, sourceVideoInfo.ColorTransfer)
+		} else if sourceVideoInfo != nil {
+			fmt.Printf("[BuildCommand] Detected SDR source: %s, ColorSpace: %s, Transfer: %s\n",
+				sourceFile, sourceVideoInfo.ColorSpace, sourceVideoInfo.ColorTransfer)
+		}
+
 		// Add video encoding args (with HDR handling)
-		args = append(args, fs.buildVideoArgs(config, sourceIsHDR)...)
+		// Returns args and any encoder-specific params string (for x265-params/svtav1-params)
+		videoArgs, encoderParamKey, encoderParamValue := fs.buildVideoArgs(config, sourceVideoInfo)
+		args = append(args, videoArgs...)
 
 		// Add audio encoding args
 		args = append(args, fs.buildAudioArgs(&config.Audio)...)
 
-		// Add extra parameters if specified
+		// Preserve subtitles (copy all subtitle streams)
+		args = append(args, "-c:s", "copy")
+
+		// Preserve attachments (fonts for subtitles, etc.)
+		args = append(args, "-c:t", "copy")
+
+		// Handle extra parameters with encoder params merging
 		if config.ExtraParams != "" {
-			// Parse extra params - split by spaces but respect quotes
-			extraArgs := parseExtraParams(config.ExtraParams)
-			args = append(args, extraArgs...)
+			// Try to merge encoder-specific params if both HDR and extra params have them
+			mergedExtra, merged := mergeEncoderParams(config.ExtraParams, encoderParamKey, encoderParamValue)
+			if merged {
+				extraArgs := parseExtraParams(mergedExtra)
+				args = append(args, extraArgs...)
+			} else {
+				// No merging needed, add HDR encoder params first, then extra params
+				if encoderParamKey != "" && encoderParamValue != "" {
+					args = append(args, encoderParamKey, encoderParamValue)
+				}
+				extraArgs := parseExtraParams(config.ExtraParams)
+				args = append(args, extraArgs...)
+			}
+		} else {
+			// No extra params, just add HDR encoder params if any
+			if encoderParamKey != "" && encoderParamValue != "" {
+				args = append(args, encoderParamKey, encoderParamValue)
+			}
 		}
 
 		// Add progress reporting
@@ -97,6 +134,78 @@ func (fs *FFmpegService) BuildCommand(ctx context.Context, sourceFile, outputFil
 
 	cmd := exec.CommandContext(ctx, fs.ffmpegPath, args...)
 	return cmd
+}
+
+// mergeEncoderParams merges HDR encoder params with extra params if they contain the same param key
+// Returns the merged extra params string and whether merging occurred.
+// Extra params take precedence (can override HDR defaults).
+func mergeEncoderParams(extraParams, hdrParamKey, hdrParamValue string) (string, bool) {
+	if hdrParamKey == "" || hdrParamValue == "" {
+		return extraParams, false
+	}
+
+	// Check if extraParams contains the same encoder param key (e.g., -x265-params or -svtav1-params)
+	if !strings.Contains(extraParams, hdrParamKey) {
+		return extraParams, false
+	}
+
+	// Parse HDR params into a map (e.g., "colorprim=bt2020:transfer=smpte2084" -> map)
+	hdrMap := parseColonParams(hdrParamValue)
+
+	// Find and extract the encoder params from extra params
+	extraArgs := parseExtraParams(extraParams)
+	var result []string
+	merged := false
+
+	for i := 0; i < len(extraArgs); i++ {
+		if extraArgs[i] == hdrParamKey && i+1 < len(extraArgs) {
+			// Found matching param key, merge values
+			extraMap := parseColonParams(extraArgs[i+1])
+
+			// HDR params as base, extra params override
+			for k, v := range extraMap {
+				hdrMap[k] = v
+			}
+
+			// Rebuild the merged param string
+			mergedValue := buildColonParams(hdrMap)
+			result = append(result, hdrParamKey, mergedValue)
+			i++ // Skip the value we just processed
+			merged = true
+		} else {
+			result = append(result, extraArgs[i])
+		}
+	}
+
+	return strings.Join(result, " "), merged
+}
+
+// parseColonParams parses "key1=val1:key2=val2" format into a map
+func parseColonParams(s string) map[string]string {
+	result := make(map[string]string)
+	pairs := strings.Split(s, ":")
+	for _, pair := range pairs {
+		if idx := strings.Index(pair, "="); idx > 0 {
+			result[pair[:idx]] = pair[idx+1:]
+		} else if pair != "" {
+			// Handle flags without values (e.g., "hdr-opt=1" vs "repeat-headers")
+			result[pair] = ""
+		}
+	}
+	return result
+}
+
+// buildColonParams builds "key1=val1:key2=val2" format from a map
+func buildColonParams(m map[string]string) string {
+	var pairs []string
+	for k, v := range m {
+		if v != "" {
+			pairs = append(pairs, k+"="+v)
+		} else {
+			pairs = append(pairs, k)
+		}
+	}
+	return strings.Join(pairs, ":")
 }
 
 // parseExtraParams parses extra parameters string respecting quotes
@@ -148,18 +257,23 @@ func (fs *FFmpegService) buildHardwareAccelArgs(hwAccel string) []string {
 }
 
 // buildVideoArgs builds video encoding arguments
+// Returns:
+//   - args: list of ffmpeg arguments (excluding encoder-specific params that need merging)
+//   - encoderParamKey: e.g., "-x265-params" or "-svtav1-params" (empty if not applicable)
+//   - encoderParamValue: the param value string (empty if not applicable)
 //
 // Preset parameter usage varies by encoder:
 //   - libx265 (H.265 CPU): uses -preset with values: ultrafast, superfast, veryfast, faster, fast, medium, slow, slower, veryslow
 //   - libsvtav1 (AV1 CPU): uses -preset with values 0-13 (0=slowest/best quality, 13=fastest/lower quality)
-//     Common values: 2-4 (high quality), 5-7 (balanced), 8-10 (fast)
 //   - NVIDIA NVENC: uses -preset with values: p1-p7, or quality presets (slow, medium, fast)
 //   - Intel QSV: uses -preset with standard values (slow, medium, fast, etc.)
 //   - AMD AMF: uses -quality with values: quality, balanced, speed
-//
-// sourceIsHDR indicates whether the source video is HDR, used for dynamic HDR handling
-func (fs *FFmpegService) buildVideoArgs(config *model.TranscodeConfig, sourceIsHDR bool) []string {
+func (fs *FFmpegService) buildVideoArgs(config *model.TranscodeConfig, sourceVideoInfo *ffprobe.VideoInfo) ([]string, string, string) {
 	args := []string{}
+	encoderParamKey := ""
+	encoderParamValue := ""
+
+	sourceIsHDR := sourceVideoInfo != nil && sourceVideoInfo.IsHDR
 
 	// Select codec based on encoder and hardware acceleration
 	codec := fs.selectVideoCodec(config.Encoder, config.HardwareAccel)
@@ -239,25 +353,55 @@ func (fs *FFmpegService) buildVideoArgs(config *model.TranscodeConfig, sourceIsH
 		// HDR -> HDR: preserve HDR metadata
 		args = append(args, "-pix_fmt", "yuv420p10le")
 
+		// Determine transfer function (PQ vs HLG)
+		colorTransfer := "smpte2084" // default to PQ
+		transferCharacteristic := "16"
+		if sourceVideoInfo.ColorTransfer == "arib-std-b67" {
+			colorTransfer = "arib-std-b67"
+			transferCharacteristic = "18"
+		}
+
 		// Add encoder-specific HDR parameters
 		switch config.HardwareAccel {
 		case "cpu":
 			if config.Encoder == "h265" || config.Encoder == "hevc" {
 				args = append(args, "-profile:v", "main10")
-				args = append(args, "-x265-params", "hdr-opt=1:repeat-headers=1:colorprim=bt2020:transfer=smpte2084:colormatrix=bt2020nc")
+				// Build x265-params with HDR metadata
+				x265Params := fmt.Sprintf("hdr-opt=1:repeat-headers=1:colorprim=bt2020:transfer=%s:colormatrix=bt2020nc", colorTransfer)
+				// Add mastering display if available
+				if sourceVideoInfo.MasteringDisplay != "" {
+					x265Params += ":master-display=" + sourceVideoInfo.MasteringDisplay
+				}
+				// Add max-cll if available
+				if sourceVideoInfo.MaxCLL > 0 || sourceVideoInfo.MaxFALL > 0 {
+					x265Params += fmt.Sprintf(":max-cll=%d,%d", sourceVideoInfo.MaxCLL, sourceVideoInfo.MaxFALL)
+				}
+				encoderParamKey = "-x265-params"
+				encoderParamValue = x265Params
 			} else if config.Encoder == "av1" {
-				args = append(args, "-svtav1-params", "color-primaries=9:transfer-characteristics=16:matrix-coefficients=9")
+				// Build svtav1-params with HDR metadata
+				svtav1Params := fmt.Sprintf("color-primaries=9:transfer-characteristics=%s:matrix-coefficients=9", transferCharacteristic)
+				// Add mastering display if available
+				if sourceVideoInfo.MasteringDisplay != "" {
+					svtav1Params += ":mastering-display=" + sourceVideoInfo.MasteringDisplay
+				}
+				// Add content-light if available
+				if sourceVideoInfo.MaxCLL > 0 || sourceVideoInfo.MaxFALL > 0 {
+					svtav1Params += fmt.Sprintf(":content-light=%d,%d", sourceVideoInfo.MaxCLL, sourceVideoInfo.MaxFALL)
+				}
+				encoderParamKey = "-svtav1-params"
+				encoderParamValue = svtav1Params
 			}
 		case "nvidia", "intel", "amd":
 			// Hardware encoders: use profile main10 and color metadata
 			args = append(args, "-profile:v", "main10")
 			args = append(args, "-color_primaries", "bt2020")
-			args = append(args, "-color_trc", "smpte2084")
+			args = append(args, "-color_trc", colorTransfer) // Dynamic: smpte2084 or arib-std-b67
 			args = append(args, "-colorspace", "bt2020nc")
 		}
 	}
 
-	return args
+	return args, encoderParamKey, encoderParamValue
 }
 
 // buildAudioArgs builds audio encoding arguments

@@ -390,11 +390,11 @@ export default function TaskList() {
                       <div className="pt-4 border-t">
                         <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-1">
                           <Terminal className="h-3 w-3" />
-                          {t.config.ffmpegCommand}
+                          {selectedTask.actualCommand ? "Executed Command" : t.config.ffmpegCommand}
                         </label>
                         <div className="mt-2 bg-muted/30 border rounded p-3">
                           <code className="text-[10px] font-mono break-all whitespace-pre-wrap text-foreground/90">
-                            {generateFFmpegCommand(selectedTask.config, selectedTask.sourceFile)}
+                            {selectedTask.actualCommand || generateFFmpegCommand(selectedTask.config, selectedTask.sourceFile)}
                           </code>
                         </div>
                       </div>
