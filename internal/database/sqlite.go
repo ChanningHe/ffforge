@@ -545,7 +545,7 @@ func (db *DB) InitializeBuiltinPresets() error {
 				Output: model.OutputConfig{
 					Container: "mkv",
 					Suffix:    "_h265_balanced",
-					PathType:  "default",
+					PathType:  "source",
 				},
 				ExtraParams: `-profile:v main10 -x265-params "high-tier=1:preset=slow:me=umh:subme=5:merange=48:weightb=1:bframes=5:ref=3:aq-mode=4" -fps_mode passthrough`,
 			},
@@ -573,7 +573,7 @@ func (db *DB) InitializeBuiltinPresets() error {
 				Output: model.OutputConfig{
 					Container: "mkv",
 					Suffix:    "_h265_standard",
-					PathType:  "default",
+					PathType:  "source",
 				},
 				ExtraParams: `-profile:v main10 -x265-params "high-tier=1:preset=slow:me=umh:subme=5:merange=48:weightb=1:ref=3:bframes=8:b-adapt=2:aq-mode=4:aq-strength=1:rd=3:rskip=1:rc-lookahead=60:psy-rd=1.6:deblock=0,-1" -fps_mode passthrough`,
 			},
@@ -601,7 +601,7 @@ func (db *DB) InitializeBuiltinPresets() error {
 				Output: model.OutputConfig{
 					Container: "mkv",
 					Suffix:    "_h265_edit",
-					PathType:  "default",
+					PathType:  "source",
 				},
 				ExtraParams: `-profile:v main10 -x265-params "high-tier=1:ctu=32:me=star:subme=5:merange=48:bframes=4:ref=3:crf=17:rd=3:rskip=1:rc-lookahead=120:tune=grain" -fps_mode passthrough`,
 			},
@@ -629,7 +629,7 @@ func (db *DB) InitializeBuiltinPresets() error {
 				Output: model.OutputConfig{
 					Container: "mkv",
 					Suffix:    "_av1_hq",
-					PathType:  "default",
+					PathType:  "source",
 				},
 				ExtraParams: `-svtav1-params "keyint=12s:scd=1:enable-tf=2:tf-strength=2:enable-qm=1:enable-variance-boost=1:variance-boost-curve=2:variance-boost-strength=2:variance-octile=2:enable-dlf=2:sharpness=6"`,
 			},
@@ -657,7 +657,7 @@ func (db *DB) InitializeBuiltinPresets() error {
 				Output: model.OutputConfig{
 					Container: "mkv",
 					Suffix:    "_av1",
-					PathType:  "default",
+					PathType:  "source",
 				},
 				ExtraParams: `-svtav1-params "keyint=12s:scd=1:enable-tf=2:tf-strength=2:enable-dlf=2:sharpness=4"`,
 			},
@@ -685,7 +685,7 @@ func (db *DB) InitializeBuiltinPresets() error {
 				Output: model.OutputConfig{
 					Container: "mkv",
 					Suffix:    "_av1_fast",
-					PathType:  "default",
+					PathType:  "source",
 				},
 				ExtraParams: `-svtav1-params "keyint=10s:scd=1:scm=0:enable-tf=2:tf-strength=2:sharpness=4"`,
 			},

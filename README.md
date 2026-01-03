@@ -93,7 +93,7 @@ go run cmd/server/main.go
 # Frontend
 cd frontend
 npm install
-npm run dev
+VITE_USE_MOCK=true npm run dev
 ```
 
 ## Configuration

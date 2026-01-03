@@ -126,7 +126,7 @@ export const mockTasks: Task[] = [
             hardwareAccel: 'cpu',
             video: { crf: 28, preset: 'slow' },
             audio: { codec: 'opus' },
-            output: { container: 'mkv', suffix: '_av1', pathType: 'source' },
+            output: { container: 'mkv', suffix: '_av1', pathType: 'default' },
         },
     },
     // Completed tasks
@@ -570,7 +570,7 @@ export const mockPresets: Preset[] = [
             hardwareAccel: 'nvidia',
             video: { crf: 28, preset: 'veryfast' },
             audio: { codec: 'copy' },
-            output: { container: 'mp4', suffix: '_fast', pathType: 'source' },
+            output: { container: 'mp4', suffix: '_fast', pathType: 'default' },
         },
     },
 ]
