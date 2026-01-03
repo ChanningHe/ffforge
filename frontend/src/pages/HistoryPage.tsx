@@ -155,9 +155,14 @@ export default function HistoryPage() {
   }
 
   // Filter only completed, failed, and cancelled tasks
-  const completedTasks = tasks?.filter(t =>
+  // Sort by completedAt or createdAt descending (newest first)
+  const completedTasks = (tasks?.filter(t =>
     t.status === 'completed' || t.status === 'failed' || t.status === 'cancelled'
-  ) || []
+  ) || []).sort((a, b) => {
+    const aTime = new Date(a.completedAt || a.createdAt || 0).getTime()
+    const bTime = new Date(b.completedAt || b.createdAt || 0).getTime()
+    return bTime - aTime
+  })
 
   // Pagination
   const totalItems = completedTasks.length

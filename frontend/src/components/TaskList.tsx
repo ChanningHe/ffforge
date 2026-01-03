@@ -148,7 +148,15 @@ export default function TaskList() {
   }
 
   // Only show active tasks (pending and running)
-  const activeTasks = tasks?.filter(t => t.status === 'running' || t.status === 'pending') || []
+  // Sort: running tasks first, then by createdAt descending (newest first)
+  const activeTasks = (tasks?.filter(t => t.status === 'running' || t.status === 'pending') || [])
+    .sort((a, b) => {
+      // Running tasks come first
+      if (a.status === 'running' && b.status !== 'running') return -1
+      if (b.status === 'running' && a.status !== 'running') return 1
+      // Then sort by createdAt descending (newest first)
+      return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
+    })
   const runningTasks = activeTasks.filter(t => t.status === 'running')
   const pendingTasks = activeTasks.filter(t => t.status === 'pending')
 
