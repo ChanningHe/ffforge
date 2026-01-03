@@ -73,10 +73,13 @@ Architectures: ${PACKAGE_ARCH}
 Signed-By: /etc/apt/keyrings/jellyfin.gpg
 EOF
 
-# Install Jellyfin FFmpeg using modern GPG key management
+# Install Jellyfin FFmpeg and locales for UTF-8 support
 RUN apt-get update \
  && apt-get install --no-install-recommends --no-install-suggests -y \
         jellyfin-ffmpeg7 \
+        locales \
+ && sed -i '/en_US.UTF-8/s/^# //g' /etc/locale.gen \
+ && locale-gen \
  && rm -rf /tmp/* /var/lib/apt/lists/* /var/tmp/* /var/log/*
 
 # Create app directory
@@ -107,7 +110,9 @@ ENV GIN_MODE=release \
     MAX_CONCURRENT_TASKS=2 \
     ENABLE_GPU=true \
     FFMPEG_PATH=/usr/share/jellyfin-ffmpeg/ffmpeg \
-    FFPROBE_PATH=/usr/share/jellyfin-ffmpeg/ffprobe
+    FFPROBE_PATH=/usr/share/jellyfin-ffmpeg/ffprobe \
+    LANG=en_US.UTF-8 \
+    LC_ALL=en_US.UTF-8
 
 # Note: Users can override FFMPEG_PATH and FFPROBE_PATH via environment variables
 # or mount custom binaries to /usr/local/bin/ffmpeg and /usr/local/bin/ffprobe
