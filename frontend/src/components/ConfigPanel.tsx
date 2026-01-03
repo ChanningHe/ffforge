@@ -42,7 +42,7 @@ export default function ConfigPanel({ selectedFiles, onConfigChange, initialConf
         preset: 'medium',
         resolution: 'original',
         fps: 'original',
-        hdrMode: [], // Default: no selection (passthrough)
+        hdrMode: ['auto'], // Default: auto (preserve HDR when source is HDR)
       },
       audio: {
         codec: 'copy',
@@ -369,8 +369,8 @@ export default function ConfigPanel({ selectedFiles, onConfigChange, initialConf
                     video: { ...config.video, hdrMode: val ? [val as HdrMode] : [] }
                   })}
                   options={[
-                    { value: '', label: language === 'zh' ? '不处理' : 'Passthrough' },
-                    { value: 'keep', label: t.config.hdrModeOptions.keep },
+                    { value: 'auto', label: language === 'zh' ? '自动' : 'Auto' },
+                    { value: '', label: language === 'zh' ? '直通' : 'Passthrough' },
                   ]}
                 />
               </div>

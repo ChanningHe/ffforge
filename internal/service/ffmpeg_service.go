@@ -234,8 +234,8 @@ func (fs *FFmpegService) buildVideoArgs(config *model.TranscodeConfig, sourceIsH
 	}
 
 	// HDR handling based on source video and user preference
-	// Only "keep" mode is supported (preserve HDR metadata when source is HDR)
-	if len(config.Video.HdrMode) > 0 && config.Video.HdrMode[0] == "keep" && sourceIsHDR {
+	// "auto" mode: preserve HDR metadata when source is HDR, otherwise passthrough
+	if len(config.Video.HdrMode) > 0 && config.Video.HdrMode[0] == "auto" && sourceIsHDR {
 		// HDR -> HDR: preserve HDR metadata
 		args = append(args, "-pix_fmt", "yuv420p10le")
 

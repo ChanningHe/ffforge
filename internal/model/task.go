@@ -60,7 +60,7 @@ type VideoConfig struct {
 	Resolution string   `json:"resolution,omitempty"` // "original", "1920x1080", etc
 	FPS        string   `json:"fps,omitempty"`        // "original", "30", "60", etc
 	Bitrate    string   `json:"bitrate,omitempty"`
-	HdrMode    []string `json:"hdrMode,omitempty"` // HDR handling: ["keep"] or empty (passthrough)
+	HdrMode    []string `json:"hdrMode,omitempty"` // HDR handling: ["auto"] (default) or empty (passthrough)
 }
 
 // AudioConfig represents audio encoding configuration

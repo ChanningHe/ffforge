@@ -46,7 +46,7 @@ export type EncoderType = 'h265' | 'av1'
 export type HardwareAccel = 'cpu' | 'nvidia' | 'intel' | 'amd'
 export type AudioCodec = 'copy' | 'aac' | 'opus' | 'mp3'
 export type OutputPathType = 'source' | 'custom' | 'default' | 'overwrite'
-export type HdrMode = 'keep' // HDR handling: keep = preserve HDR/SDR
+export type HdrMode = 'auto' // HDR handling: auto = preserve HDR when source is HDR
 
 export interface TranscodeConfig {
   mode?: 'simple' | 'advanced' // Configuration mode (default: simple)

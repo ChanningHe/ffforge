@@ -23,6 +23,7 @@ cmd/server/server
 build/
 frontend/dist/
 frontend/node_modules/
+ffforge
 
 # IDE
 .vscode/

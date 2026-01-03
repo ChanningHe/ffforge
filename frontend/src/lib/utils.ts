@@ -124,8 +124,8 @@ export function generateFFmpegCommand(
       }
     }
 
-    // HDR handling (only "keep" mode is supported)
-    if (video.hdrMode && video.hdrMode.length > 0 && video.hdrMode.includes('keep')) {
+    // HDR handling (only "auto" mode is supported)
+    if (video.hdrMode && video.hdrMode.length > 0 && video.hdrMode.includes('auto')) {
       // Preserve HDR: requires 10-bit pixel format and HDR metadata parameters
       // Note: This is for preview only. Backend will check if source is actually HDR.
       parts.push('-pix_fmt', 'yuv420p10le')
