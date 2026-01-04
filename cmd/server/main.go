@@ -113,6 +113,10 @@ func main() {
 		apiGroup.GET("/system/usage", systemHandler.GetUsage)
 		apiGroup.GET("/system/history", systemHandler.GetHistory)
 
+		// Command preview
+		commandHandler := api.NewCommandHandler(ffmpegService)
+		apiGroup.POST("/command/preview", commandHandler.PreviewCommand)
+
 		// WebSocket
 		apiGroup.GET("/ws/progress", wsHandler.HandleWebSocket)
 	}
