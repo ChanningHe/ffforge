@@ -265,6 +265,33 @@ class MockAPIClient {
         settings = { ...settings, ...newSettings, updatedAt: new Date().toISOString() }
         return settings
     }
+
+    // Command Preview
+    async previewCommand(config: TranscodeConfig, sourceFile?: string): Promise<string> {
+        await delay(50)
+        const input = sourceFile || 'input.mp4'
+        const encoder = config.encoder === 'h265' ? 'libx265' : 'libsvtav1'
+        const suffix = config.output?.suffix || '_encoded'
+        const container = config.output?.container || 'mp4'
+        const outputBase = input.replace(/\.[^.]+$/, '')
+        const output = `${outputBase}${suffix}.${container}`
+
+        // Build mock command
+        const parts = ['ffmpeg']
+        parts.push('-i', input)
+        parts.push('-map', '0')
+        parts.push('-map_metadata', '0')
+        parts.push('-c:v', encoder)
+        if (config.video?.preset) parts.push('-preset', config.video.preset)
+        if (config.video?.crf) parts.push('-crf', config.video.crf.toString())
+        parts.push('-c:a', config.audio?.codec || 'copy')
+        parts.push('-c:s', 'copy')
+        parts.push('-c:t', 'copy')
+        if (config.extraParams) parts.push(config.extraParams)
+        parts.push(output)
+
+        return parts.join(' ')
+    }
 }
 
 export { MockAPIClient }

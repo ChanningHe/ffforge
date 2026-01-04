@@ -136,7 +136,96 @@ func (fs *FFmpegService) BuildCommand(ctx context.Context, sourceFile, outputFil
 	return cmd
 }
 
-// mergeEncoderParams merges HDR encoder params with extra params if they contain the same param key
+// BuildCommandPreview generates FFmpeg command arguments for preview display
+// Unlike BuildCommand, this doesn't require a context and returns args directly for display
+// sourceVideoInfo can be nil for preview (assumes HDR mode applies when hdrMode is set)
+func (fs *FFmpegService) BuildCommandPreview(sourceFile string, config *model.TranscodeConfig) []string {
+	// Generate output file path
+	outputFile := fs.GenerateOutputPath(sourceFile, config)
+
+	args := []string{}
+
+	// Check if using advanced mode (custom CLI)
+	if config.Mode == "advanced" && config.CustomCommand != "" {
+		// Advanced mode: use custom command parameters
+		customCmd := config.CustomCommand
+		customCmd = strings.ReplaceAll(customCmd, "[[INPUT]]", sourceFile)
+		customCmd = strings.ReplaceAll(customCmd, "[[OUTPUT]]", outputFile)
+
+		customArgs := parseExtraParams(customCmd)
+
+		if !strings.Contains(config.CustomCommand, "[[INPUT]]") {
+			args = append(args, "-i", sourceFile)
+		}
+
+		args = append(args, customArgs...)
+
+		if !strings.Contains(config.CustomCommand, "[[OUTPUT]]") {
+			args = append(args, outputFile)
+		}
+
+		return args
+	}
+
+	// Simple mode: use UI-based configuration
+	args = append(args, fs.buildHardwareAccelArgs(config.HardwareAccel)...)
+
+	// Add input file
+	args = append(args, "-i", sourceFile)
+
+	// Map all streams
+	args = append(args, "-map", "0")
+
+	// Preserve metadata
+	args = append(args, "-map_metadata", "0")
+
+	// For preview, assume HDR applies when hdrMode is set (we don't have actual video info)
+	// Create a mock VideoInfo based on hdrMode setting
+	var mockVideoInfo *ffprobe.VideoInfo
+	if len(config.Video.HdrMode) > 0 && config.Video.HdrMode[0] == "auto" {
+		// For preview, assume HDR10 (PQ) as default when HDR mode is enabled
+		mockVideoInfo = &ffprobe.VideoInfo{
+			IsHDR:         true,
+			ColorTransfer: "smpte2084", // Default to PQ for preview
+		}
+	}
+
+	// Build video args
+	videoArgs, encoderParamKey, encoderParamValue := fs.buildVideoArgs(config, mockVideoInfo)
+	args = append(args, videoArgs...)
+
+	// Build audio args
+	args = append(args, fs.buildAudioArgs(&config.Audio)...)
+
+	// Preserve subtitles and attachments
+	args = append(args, "-c:s", "copy")
+	args = append(args, "-c:t", "copy")
+
+	// Handle extra parameters with encoder params merging
+	if config.ExtraParams != "" {
+		mergedExtra, merged := mergeEncoderParams(config.ExtraParams, encoderParamKey, encoderParamValue)
+		if merged {
+			extraArgs := parseExtraParams(mergedExtra)
+			args = append(args, extraArgs...)
+		} else {
+			if encoderParamKey != "" && encoderParamValue != "" {
+				args = append(args, encoderParamKey, encoderParamValue)
+			}
+			extraArgs := parseExtraParams(config.ExtraParams)
+			args = append(args, extraArgs...)
+		}
+	} else {
+		if encoderParamKey != "" && encoderParamValue != "" {
+			args = append(args, encoderParamKey, encoderParamValue)
+		}
+	}
+
+	// Output file (no progress pipe for preview)
+	args = append(args, outputFile)
+
+	return args
+}
+
 // Returns the merged extra params string and whether merging occurred.
 // Extra params take precedence (can override HDR defaults).
 func mergeEncoderParams(extraParams, hdrParamKey, hdrParamValue string) (string, bool) {

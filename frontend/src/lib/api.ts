@@ -178,6 +178,21 @@ class APIClient {
     if (!response.ok) throw new Error('Failed to update settings')
     return response.json()
   }
+
+  // Command Preview
+  async previewCommand(config: TranscodeConfig, sourceFile?: string): Promise<string> {
+    const response = await fetch(`${getAPIBaseURL()}/command/preview`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        config,
+        sourceFile: sourceFile || 'input.mp4'
+      }),
+    })
+    if (!response.ok) throw new Error('Failed to preview command')
+    const data = await response.json()
+    return data.command
+  }
 }
 
 // Switch between real and mock API based on environment variable

@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { X, CheckSquare, Square, Terminal } from 'lucide-react'
 import { api } from '@/lib/api'
 import { useWebSocket } from '@/hooks/useWebSocket'
+import { useCommandPreview } from '@/hooks/useCommandPreview'
 import { useApp } from '@/contexts/AppContext'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
@@ -11,7 +12,7 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { Pagination } from '@/components/ui/pagination'
 import { useToast } from '@/components/ui/toast'
 import { TaskItem } from '@/components/TaskItem'
-import { formatSpeed, formatDuration, generateFFmpegCommand } from '@/lib/utils'
+import { formatSpeed, formatDuration } from '@/lib/utils'
 import type { Task, TaskStatus, ProgressUpdate } from '@/types'
 
 const getStatusVariant = (status: TaskStatus): "default" | "secondary" | "destructive" | "outline" => {
@@ -39,6 +40,12 @@ export default function TaskList() {
   const [selectedTasks, setSelectedTasks] = useState<string[]>([])
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
+
+  // Get command preview for selected task (when actualCommand is not available)
+  const { command: previewCommand } = useCommandPreview(
+    selectedTask?.actualCommand ? null : selectedTask?.config || null,
+    { sourceFile: selectedTask?.sourceFile }
+  )
 
   const { data: tasks, isLoading } = useQuery({
     queryKey: ['tasks'],
@@ -394,7 +401,7 @@ export default function TaskList() {
                         </label>
                         <div className="mt-2 bg-muted/30 border rounded p-3">
                           <code className="text-[10px] font-mono break-all whitespace-pre-wrap text-foreground/90">
-                            {selectedTask.actualCommand || generateFFmpegCommand(selectedTask.config, selectedTask.sourceFile)}
+                            {selectedTask.actualCommand || previewCommand || 'Loading...'}
                           </code>
                         </div>
                       </div>
