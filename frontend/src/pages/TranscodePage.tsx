@@ -78,19 +78,27 @@ export default function TranscodePage() {
         <div className="flex items-start gap-2">
           <Terminal className="w-4 h-4 mt-0.5 text-muted-foreground flex-shrink-0" />
           <div className="flex-1 min-w-0">
-            <div className="text-xs font-medium text-muted-foreground mb-1">
-              {t.config.ffmpegCommand}
-            </div>
-            <code className="text-[10px] font-mono bg-background px-2 py-1 rounded border block overflow-x-auto whitespace-pre-wrap break-all">
-              {isCommandLoading ? (
-                <span className="flex items-center gap-1 text-muted-foreground">
-                  <Loader2 className="h-3 w-3 animate-spin" />
-                  Generating preview...
-                </span>
-              ) : (
-                ffmpegCommand || 'Configure settings to see command preview'
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-xs font-medium text-muted-foreground">
+                {t.config.ffmpegCommand}
+              </span>
+              {isCommandLoading && (
+                <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
               )}
-            </code>
+            </div>
+            {/* Fixed height container with scroll and fade animation */}
+            <div className="relative">
+              <code
+                className="text-[10px] font-mono bg-background px-2 py-1.5 rounded border block whitespace-pre-wrap break-all transition-opacity duration-200"
+                style={{ opacity: isCommandLoading && !ffmpegCommand ? 0.5 : 1 }}
+              >
+                {ffmpegCommand || (
+                  <span className="text-muted-foreground italic">
+                    {isCommandLoading ? 'Generating preview...' : 'Configure settings to see command preview'}
+                  </span>
+                )}
+              </code>
+            </div>
           </div>
         </div>
       </div>

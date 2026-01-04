@@ -27,6 +27,7 @@ export function useCommandPreview(
     const [error, setError] = useState<string | null>(null)
     const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
     const abortControllerRef = useRef<AbortController | null>(null)
+    const isFirstLoadRef = useRef<boolean>(true)
 
     const fetchPreview = useCallback(async (currentConfig: TranscodeConfig) => {
         // Cancel previous request
@@ -36,10 +37,14 @@ export function useCommandPreview(
         abortControllerRef.current = new AbortController()
 
         try {
-            setIsLoading(true)
+            // Only show loading state on first fetch to avoid flicker
+            if (isFirstLoadRef.current) {
+                setIsLoading(true)
+            }
             setError(null)
             const result = await api.previewCommand(currentConfig, sourceFile)
             setCommand(result)
+            isFirstLoadRef.current = false
         } catch (err) {
             if (err instanceof Error && err.name !== 'AbortError') {
                 setError(err.message)
